@@ -45,7 +45,6 @@ abstract final class AppConfig {
 
   static bool get isDev => flavor == Flavor.dev;
 
-  static Duration get connectTimeout => Duration(
-    milliseconds: connectTimeoutMs,
-  );
+  static Duration get connectTimeout =>
+      Duration(milliseconds: connectTimeoutMs);
 }

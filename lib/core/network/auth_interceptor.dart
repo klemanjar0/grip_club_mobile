@@ -9,10 +9,7 @@ import 'package:grip_club_mobile/core/storage/token_storage.dart';
 /// bloc so the network layer stays free of any dependency on feature code.
 class AuthInterceptor extends Interceptor {
   // Private field formal: callers still pass `tokenStorage:`.
-  AuthInterceptor({
-    required this._tokenStorage,
-    required this.onUnauthorized,
-  });
+  AuthInterceptor({required this._tokenStorage, required this.onUnauthorized});
 
   static const String authorizationHeader = 'Authorization';
 

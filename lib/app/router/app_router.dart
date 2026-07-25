@@ -25,9 +25,8 @@ GoRouter createRouter(AuthBloc authBloc) => GoRouter(
     return switch (authBloc.state.status) {
       // Still validating the stored token: hold on the splash screen.
       AuthStatus.unknown => location == Routes.splash ? null : Routes.splash,
-      AuthStatus.unauthenticated => location == Routes.login
-          ? null
-          : Routes.login,
+      AuthStatus.unauthenticated =>
+        location == Routes.login ? null : Routes.login,
       AuthStatus.authenticated =>
         location == Routes.login || location == Routes.splash
             ? Routes.home
@@ -58,9 +57,9 @@ GoRouter createRouter(AuthBloc authBloc) => GoRouter(
 class GoRouterRefreshStream extends ChangeNotifier {
   GoRouterRefreshStream(Stream<dynamic> stream) {
     notifyListeners();
-    _subscription = stream
-        .asBroadcastStream()
-        .listen((dynamic _) => notifyListeners());
+    _subscription = stream.asBroadcastStream().listen(
+      (dynamic _) => notifyListeners(),
+    );
   }
 
   late final StreamSubscription<dynamic> _subscription;

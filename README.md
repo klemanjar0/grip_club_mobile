@@ -21,6 +21,23 @@ Every run needs three things that must agree: the native flavor (`--flavor`), th
 file is caught at startup by `bootstrap()` and shown as a configuration error screen instead of
 silently pointing a prod build at the dev API.
 
+The [`Makefile`](Makefile) wraps all of it — run `make` for the full list:
+
+```bash
+make run-dev                     # dev flavor, debug
+make run-dev DEVICE=<device-id>  # pick a device (make devices to list them)
+make run-prod-release            # prod flavor, release
+make verify                      # analyze + test
+
+make apk-dev                     # dev APK (debug)
+make apk-prod                    # prod APK (release)
+make bundle-prod                 # prod App Bundle for Play
+make ios-dev / make ios-prod     # unsigned iOS builds
+make ipa-prod                    # signed IPA for distribution
+```
+
+The equivalent raw commands, if you prefer them:
+
 ```bash
 # dev, debug
 flutter run --flavor dev -t lib/main_dev.dart --dart-define-from-file=env/dev.json
@@ -93,8 +110,9 @@ lib/
 ## Tests
 
 ```bash
-flutter analyze
-flutter test
+make verify        # analyze + test
+make coverage      # writes coverage/lcov.info
+make format-check  # fails on unformatted code (use in CI)
 ```
 
 ## Regenerating the iOS flavor setup
@@ -105,5 +123,9 @@ restricted to the `ios:*` processors. Android flavors and all Dart code are hand
 `android:*` or `flutter:*` instructions, they would overwrite those files.
 
 ```bash
-dart run flutter_flavorizr -f
+make ios-flavors   # dart run flutter_flavorizr -f
 ```
+
+`ASSETCATALOG_COMPILER_APPICON_NAME` resolves to `AppIcon-dev` / `AppIcon-prod`, so both icon sets must
+exist in `ios/Runner/Assets.xcassets` or the iOS build fails. They currently hold copies of the default
+icon — drop real dev artwork into `AppIcon-dev.appiconset` to tell the builds apart on the home screen.

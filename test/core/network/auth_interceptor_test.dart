@@ -83,8 +83,9 @@ void main() {
     await dio.get<Map<String, dynamic>>('/auth/me');
 
     expect(
-      adapter.lastRequest?.headers
-          .containsKey(AuthInterceptor.authorizationHeader),
+      adapter.lastRequest?.headers.containsKey(
+        AuthInterceptor.authorizationHeader,
+      ),
       isFalse,
     );
   });

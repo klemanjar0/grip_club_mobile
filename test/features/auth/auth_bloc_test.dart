@@ -90,9 +90,7 @@ void main() {
           username: any(named: 'username'),
           password: any(named: 'password'),
         ),
-      ).thenThrow(
-        const ApiException('Invalid credentials', statusCode: 400),
-      ),
+      ).thenThrow(const ApiException('Invalid credentials', statusCode: 400)),
       build: () => AuthBloc(repository: repository),
       act: (bloc) => bloc.add(
         const AuthLoginRequested(username: 'emilys', password: 'wrong'),
