@@ -37,6 +37,24 @@ final class AuthLogoutRequested extends AuthEvent {
   const AuthLogoutRequested();
 }
 
+/// Revokes every session, this device included.
+final class AuthLogoutAllRequested extends AuthEvent {
+  const AuthLogoutAllRequested();
+}
+
+/// The profile changed elsewhere (the preferences form saved a new one).
+///
+/// Keeps the app-wide [User] current without a refetch — the lobby feeds read
+/// their default city and time filter from it.
+final class AuthUserUpdated extends AuthEvent {
+  const AuthUserUpdated(this.user);
+
+  final User user;
+
+  @override
+  List<Object?> get props => [user];
+}
+
 /// Dispatched by [AuthInterceptor] when the server rejects the stored token.
 final class AuthSessionExpired extends AuthEvent {
   const AuthSessionExpired();

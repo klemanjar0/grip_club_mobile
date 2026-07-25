@@ -59,6 +59,47 @@ class AuthRepository {
     }
   }
 
+  /// Revokes every session for this user, this one included, then drops the
+  /// local token.
+  ///
+  /// Unlike [logout] a failure is *not* swallowed: "sign out everywhere" is a
+  /// security action, and silently keeping other devices signed in would be a
+  /// lie. The local token is cleared either way.
+  Future<void> logoutAll() async {
+    try {
+      await _dio.post<void>('/auth/logout-all');
+    } on DioException catch (exception) {
+      throw ApiException.fromDioException(exception);
+    } finally {
+      await _tokenStorage.clearToken();
+    }
+  }
+
+  /// `PATCH /auth/password`.
+  ///
+  /// Every other session is revoked server-side; the token in use survives, so
+  /// the caller stays signed in on this device.
+  ///
+  /// Fails with `401 invalid_credentials` when [currentPassword] is wrong, and
+  /// `400 validation_failed` when the new one is too short, too long, or
+  /// identical to the current one.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _dio.patch<void>(
+        '/auth/password',
+        data: <String, dynamic>{
+          'current_password': currentPassword,
+          'new_password': newPassword,
+        },
+      );
+    } on DioException catch (exception) {
+      throw ApiException.fromDioException(exception);
+    }
+  }
+
   /// Shared by login and register: both return `CredentialsResponse`.
   ///
   /// That payload's nested user is only `{id, email, created_at}`, so the token

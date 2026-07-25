@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:grip_club_mobile/app/di/injector.dart';
 import 'package:grip_club_mobile/app/router/app_router.dart';
 import 'package:grip_club_mobile/app/router/routes.dart';
 import 'package:grip_club_mobile/features/auth/bloc/auth_bloc.dart';
@@ -12,7 +13,9 @@ import 'package:grip_club_mobile/features/auth/domain/user.dart';
 import 'package:grip_club_mobile/features/auth/view/login_page.dart';
 import 'package:grip_club_mobile/features/auth/view/register_page.dart';
 import 'package:grip_club_mobile/features/auth/view/splash_page.dart';
-import 'package:grip_club_mobile/features/home/view/home_page.dart';
+import 'package:grip_club_mobile/features/lobbies/view/lobbies_page.dart';
+
+import '../helpers/dashboard_harness.dart';
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
@@ -35,11 +38,15 @@ void main() {
   setUp(() {
     repository = _MockAuthRepository();
     when(repository.logout).thenAnswer((_) async {});
+    // The dashboard tabs resolve their blocs from the container, so the guard
+    // cannot be exercised without one.
+    registerDashboardStubs(auth: repository);
   });
 
   tearDown(() async {
     router.dispose();
     await bloc.close();
+    await getIt.reset();
   });
 
   /// Mounts the real router over a real bloc — the guard is the thing under
@@ -99,7 +106,9 @@ void main() {
     expect(find.byType(RegisterPage), findsOneWidget);
   });
 
-  testWidgets('sends a restored session straight to home', (tester) async {
+  testWidgets('sends a restored session straight to the lobbies tab', (
+    tester,
+  ) async {
     when(() => repository.hasStoredSession).thenReturn(true);
     when(repository.currentUser).thenAnswer((_) async => _user);
 
@@ -108,8 +117,7 @@ void main() {
     await tester.pump(_pastSplashFloor);
     await tester.pump();
 
-    expect(find.byType(HomePage), findsOneWidget);
-    expect(find.text('rider'), findsOneWidget);
+    expect(find.byType(LobbiesPage), findsOneWidget);
   });
 
   testWidgets('keeps a signed-in user off the auth screens', (tester) async {
@@ -124,6 +132,6 @@ void main() {
     router.go(Routes.login);
     await tester.pumpAndSettle();
 
-    expect(find.byType(HomePage), findsOneWidget);
+    expect(find.byType(LobbiesPage), findsOneWidget);
   });
 }

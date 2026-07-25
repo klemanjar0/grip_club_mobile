@@ -21,6 +21,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLoginRequested>(_onLoginRequested);
     on<AuthRegisterRequested>(_onRegisterRequested);
     on<AuthLogoutRequested>(_onLogoutRequested);
+    on<AuthLogoutAllRequested>(_onLogoutAllRequested);
+    on<AuthUserUpdated>(_onUserUpdated);
     on<AuthSessionExpired>(_onSessionExpired);
   }
 
@@ -98,6 +100,28 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     await _repository.logout();
     emit(const AuthState.unauthenticated());
+  }
+
+  /// Signing out everywhere ends this session too, so it lands on the login
+  /// screen exactly like [_onLogoutRequested]. A failed call still signs this
+  /// device out — the repository has already dropped the local token.
+  Future<void> _onLogoutAllRequested(
+    AuthLogoutAllRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    try {
+      await _repository.logoutAll();
+      emit(const AuthState.unauthenticated());
+    } on ApiException catch (exception) {
+      emit(AuthState.unauthenticated(errorMessage: exception.message));
+    }
+  }
+
+  void _onUserUpdated(AuthUserUpdated event, Emitter<AuthState> emit) {
+    // Ignored when signed out: a stale profile must never resurrect a session.
+    if (state.status != AuthStatus.authenticated) return;
+
+    emit(AuthState.authenticated(event.user));
   }
 
   void _onSessionExpired(AuthSessionExpired event, Emitter<AuthState> emit) {

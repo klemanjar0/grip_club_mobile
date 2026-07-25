@@ -15,22 +15,30 @@ class GripClubApp extends StatelessWidget {
       // Provided from the container so the same instance drives both the UI and
       // the router guard. `AuthStarted` is dispatched in bootstrap().
       value: getIt<AuthBloc>(),
-      child: MaterialApp.router(
-        title: AppConfig.appName,
-        debugShowCheckedModeBanner: AppConfig.isDev,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            // A different accent per flavor makes it obvious at a glance which
-            // build is on the device.
-            seedColor: AppConfig.isDev
-                ? const Color(0xFFE8590C)
-                : const Color(0xFF1F6FEB),
+      child: BlocListener<AuthBloc, AuthState>(
+        // The tab blocs are singletons that outlive a session, so the end of one
+        // is the moment to empty them — see [clearSessionCaches].
+        listenWhen: (previous, current) =>
+            previous.status == AuthStatus.authenticated &&
+            current.status != AuthStatus.authenticated,
+        listener: (context, state) => clearSessionCaches(),
+        child: MaterialApp.router(
+          title: AppConfig.appName,
+          debugShowCheckedModeBanner: AppConfig.isDev,
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              // A different accent per flavor makes it obvious at a glance which
+              // build is on the device.
+              seedColor: AppConfig.isDev
+                  ? const Color(0xFFE8590C)
+                  : const Color(0xFF1F6FEB),
+            ),
+            inputDecorationTheme: const InputDecorationTheme(
+              border: OutlineInputBorder(),
+            ),
           ),
-          inputDecorationTheme: const InputDecorationTheme(
-            border: OutlineInputBorder(),
-          ),
+          routerConfig: getIt<GoRouter>(),
         ),
-        routerConfig: getIt<GoRouter>(),
       ),
     );
   }
