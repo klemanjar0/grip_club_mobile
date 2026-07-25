@@ -1,44 +1,65 @@
 import 'package:equatable/equatable.dart';
 
-/// The signed-in user, as returned by `POST /auth/login` and `GET /auth/me`.
+/// The signed-in user, as returned by `GET /me`.
+///
+/// Mirrors the API's `UserResponse`. [locale] and [timeFilter] stay as strings
+/// rather than enums: they are server-defined vocabularies, and nothing in the
+/// app branches on them yet.
 class User extends Equatable {
   const User({
     required this.id,
-    required this.username,
     required this.email,
-    this.firstName = '',
-    this.lastName = '',
-    this.imageUrl,
+    required this.displayName,
+    required this.createdAt,
+    this.locale = 'en',
+    this.timezone = 'UTC',
+    this.city = '',
+    this.timeFilter = 'all',
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
-    id: json['id'] as int,
-    username: json['username'] as String? ?? '',
+    id: json['id'] as String? ?? '',
     email: json['email'] as String? ?? '',
-    firstName: json['firstName'] as String? ?? '',
-    lastName: json['lastName'] as String? ?? '',
-    imageUrl: json['image'] as String?,
+    // The server guarantees a non-empty display name (it falls back to the
+    // email local part), but a missing key must not blank the UI.
+    displayName: switch (json['display_name']) {
+      final String name when name.isNotEmpty => name,
+      _ => json['email'] as String? ?? '',
+    },
+    locale: json['locale'] as String? ?? 'en',
+    timezone: json['timezone'] as String? ?? 'UTC',
+    city: json['city'] as String? ?? '',
+    timeFilter: json['time_filter'] as String? ?? 'all',
+    createdAt: DateTime.tryParse(json['created_at'] as String? ?? ''),
   );
 
-  final int id;
-  final String username;
+  final String id;
   final String email;
-  final String firstName;
-  final String lastName;
-  final String? imageUrl;
+  final String displayName;
 
-  String get displayName {
-    final fullName = '$firstName $lastName'.trim();
-    return fullName.isEmpty ? username : fullName;
-  }
+  /// `en` | `ru`.
+  final String locale;
+
+  /// IANA timezone name.
+  final String timezone;
+
+  /// Saved browsing default; `''` means everywhere.
+  final String city;
+
+  /// Saved browsing default: `day` | `week` | `month` | `all`.
+  final String timeFilter;
+
+  final DateTime? createdAt;
 
   @override
   List<Object?> get props => [
     id,
-    username,
     email,
-    firstName,
-    lastName,
-    imageUrl,
+    displayName,
+    locale,
+    timezone,
+    city,
+    timeFilter,
+    createdAt,
   ];
 }

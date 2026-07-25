@@ -1,0 +1,20 @@
+# Native launch screens. Regenerate with `make splash` after any change here.
+#
+# The colour must stay in step with `SplashPage`'s scaffold background — the
+# whole point is that the handover from the OS launch screen to the Flutter
+# splash is invisible.
+#
+# There is no logo in the repo yet. To add one, drop it at
+# `assets/splash/logo.png`, declare the asset in pubspec.yaml, uncomment the
+# `image` keys below and re-run `make splash`.
+flutter_native_splash:
+  color: "#FFFFFF"
+  # image: assets/splash/logo.png
+
+  android_12:
+    color: "#FFFFFF"
+    # image: assets/splash/logo.png
+
+  android: true
+  ios: true
+  web: false

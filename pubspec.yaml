@@ -55,6 +55,9 @@ dev_dependencies:
   bloc_test: ^10.0.0
   mocktail: ^1.0.5
   flutter_flavorizr: ^2.6.0
+  # Generates the native launch screens (`make splash`) so the OS shows the
+  # same blank canvas the Flutter splash paints — no white flash on boot.
+  flutter_native_splash: ^2.4.6
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

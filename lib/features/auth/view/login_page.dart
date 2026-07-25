@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:grip_club_mobile/app/config/app_config.dart';
+import 'package:grip_club_mobile/app/router/routes.dart';
 import 'package:grip_club_mobile/features/auth/bloc/auth_bloc.dart';
-
-/// Dev credentials for the dummyjson API the dev flavor points at.
-const String _devUsername = 'emilys';
-const String _devPassword = 'emilyspass';
+import 'package:grip_club_mobile/features/auth/view/auth_validators.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -17,17 +16,12 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  // Prefilled in dev so the sample API can be exercised in one tap.
-  final _usernameController = TextEditingController(
-    text: AppConfig.isDev ? _devUsername : '',
-  );
-  final _passwordController = TextEditingController(
-    text: AppConfig.isDev ? _devPassword : '',
-  );
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -38,7 +32,7 @@ class _LoginPageState extends State<LoginPage> {
     FocusScope.of(context).unfocus();
     context.read<AuthBloc>().add(
       AuthLoginRequested(
-        username: _usernameController.text.trim(),
+        email: _emailController.text.trim(),
         password: _passwordController.text,
       ),
     );
@@ -75,17 +69,14 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         const SizedBox(height: 32),
                         TextFormField(
-                          controller: _usernameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Username',
-                          ),
+                          controller: _emailController,
+                          decoration: const InputDecoration(labelText: 'Email'),
+                          keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
                           autocorrect: false,
+                          autofillHints: const [AutofillHints.username],
                           enabled: !state.isSubmitting,
-                          validator: (value) =>
-                              (value == null || value.trim().isEmpty)
-                              ? 'Enter your username'
-                              : null,
+                          validator: AuthValidators.email,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
@@ -94,11 +85,10 @@ class _LoginPageState extends State<LoginPage> {
                             labelText: 'Password',
                           ),
                           obscureText: true,
+                          autofillHints: const [AutofillHints.password],
                           enabled: !state.isSubmitting,
                           onFieldSubmitted: (_) => _submit(),
-                          validator: (value) => (value == null || value.isEmpty)
-                              ? 'Enter your password'
-                              : null,
+                          validator: AuthValidators.presentPassword,
                         ),
                         const SizedBox(height: 24),
                         FilledButton(
@@ -112,11 +102,19 @@ class _LoginPageState extends State<LoginPage> {
                                 )
                               : const Text('Sign in'),
                         ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          // Pushed, not gone to, so the back gesture returns
+                          // here. The guard allows /register while signed out.
+                          onPressed: state.isSubmitting
+                              ? null
+                              : () => context.pushNamed(Routes.registerName),
+                          child: const Text('Create an account'),
+                        ),
                         if (AppConfig.isDev) ...[
                           const SizedBox(height: 24),
                           Text(
-                            'dev flavor · ${AppConfig.apiBaseUrl}\n'
-                            '$_devUsername / $_devPassword',
+                            'dev flavor · ${AppConfig.apiBaseUrl}',
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),

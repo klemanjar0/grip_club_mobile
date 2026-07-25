@@ -68,7 +68,7 @@ void main() {
       adapter: adapter,
     );
 
-    await dio.get<Map<String, dynamic>>('/auth/me');
+    await dio.get<Map<String, dynamic>>('/me');
 
     expect(
       adapter.lastRequest?.headers[AuthInterceptor.authorizationHeader],
@@ -80,7 +80,7 @@ void main() {
     final adapter = _CapturingAdapter();
     final dio = dioWith(storage: await storageWith(), adapter: adapter);
 
-    await dio.get<Map<String, dynamic>>('/auth/me');
+    await dio.get<Map<String, dynamic>>('/me');
 
     expect(
       adapter.lastRequest?.headers.containsKey(
@@ -100,7 +100,7 @@ void main() {
     );
 
     await expectLater(
-      dio.get<Map<String, dynamic>>('/auth/me'),
+      dio.get<Map<String, dynamic>>('/me'),
       throwsA(isA<DioException>()),
     );
 

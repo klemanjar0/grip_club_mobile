@@ -13,13 +13,24 @@ final class AuthStarted extends AuthEvent {
 }
 
 final class AuthLoginRequested extends AuthEvent {
-  const AuthLoginRequested({required this.username, required this.password});
+  const AuthLoginRequested({required this.email, required this.password});
 
-  final String username;
+  final String email;
   final String password;
 
   @override
-  List<Object?> get props => [username, password];
+  List<Object?> get props => [email, password];
+}
+
+/// Registering also signs the user in — there is no separate login step.
+final class AuthRegisterRequested extends AuthEvent {
+  const AuthRegisterRequested({required this.email, required this.password});
+
+  final String email;
+  final String password;
+
+  @override
+  List<Object?> get props => [email, password];
 }
 
 final class AuthLogoutRequested extends AuthEvent {

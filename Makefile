@@ -3,6 +3,7 @@
 #   make                     list every target
 #   make run-dev             run the dev flavor in debug
 #   make run-dev DEVICE=...  pick a device (see `make devices`)
+#   make run-dev API_URL=... point the dev flavor at another backend
 #   make verify              analyze + test
 #
 # Every run/build target passes the three flags that must always agree: the
@@ -11,10 +12,18 @@
 FLUTTER ?= flutter
 DEVICE ?=
 
+# env/dev.json points at http://localhost:8080, which the Android emulator
+# cannot reach — it sees the host as 10.0.2.2. A later --dart-define wins over
+# --dart-define-from-file, so this overrides the single key:
+#
+#   make run-dev API_URL=http://10.0.2.2:8080/api/v1
+API_URL ?=
+
 # Expands to nothing when DEVICE is unset, letting Flutter prompt as usual.
 DEVICE_ARG := $(if $(DEVICE),-d $(DEVICE),)
+API_URL_ARG := $(if $(API_URL),--dart-define=API_BASE_URL=$(API_URL),)
 
-DEV_FLAGS  := --flavor dev  -t lib/main_dev.dart  --dart-define-from-file=env/dev.json
+DEV_FLAGS  := --flavor dev  -t lib/main_dev.dart  --dart-define-from-file=env/dev.json $(API_URL_ARG)
 PROD_FLAGS := --flavor prod -t lib/main_prod.dart --dart-define-from-file=env/prod.json
 
 .DEFAULT_GOAL := help
@@ -27,7 +36,8 @@ help: ## List available targets
 		/^##@/ {printf "\n\033[1m%s\033[0m\n", substr($$0, 5)} \
 		/^[a-zA-Z0-9_-]+:.*##/ {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' \
 		$(MAKEFILE_LIST)
-	@printf "\nOverride the device with DEVICE=<id>, e.g. make run-dev DEVICE=chrome\n\n"
+	@printf "\nOverride the device with DEVICE=<id>, e.g. make run-dev DEVICE=chrome\n"
+	@printf "Override the dev backend with API_URL=<url>, e.g. API_URL=http://10.0.2.2:8080/api/v1\n\n"
 
 .PHONY: setup
 setup: ## Fetch dependencies
@@ -132,3 +142,8 @@ reset: clean setup ## Clean, then re-fetch dependencies
 .PHONY: ios-flavors
 ios-flavors: ## Regenerate the iOS build configs and schemes from flavorizr.yaml
 	dart run flutter_flavorizr -f
+
+.PHONY: splash
+splash: ## Regenerate native launch screens from flutter_native_splash.yaml
+	dart run flutter_native_splash:create
+	@printf "\nRe-run this after 'make ios-flavors' — flavorizr rewrites iOS project files.\n\n"

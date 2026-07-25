@@ -7,6 +7,7 @@ import 'package:grip_club_mobile/app/config/app_config.dart';
 import 'package:grip_club_mobile/app/router/routes.dart';
 import 'package:grip_club_mobile/features/auth/bloc/auth_bloc.dart';
 import 'package:grip_club_mobile/features/auth/view/login_page.dart';
+import 'package:grip_club_mobile/features/auth/view/register_page.dart';
 import 'package:grip_club_mobile/features/auth/view/splash_page.dart';
 import 'package:grip_club_mobile/features/home/view/home_page.dart';
 
@@ -22,15 +23,15 @@ GoRouter createRouter(AuthBloc authBloc) => GoRouter(
   redirect: (context, state) {
     final location = state.matchedLocation;
 
+    final isAuthRoute = location == Routes.login || location == Routes.register;
+
     return switch (authBloc.state.status) {
       // Still validating the stored token: hold on the splash screen.
       AuthStatus.unknown => location == Routes.splash ? null : Routes.splash,
-      AuthStatus.unauthenticated =>
-        location == Routes.login ? null : Routes.login,
+      // Both auth screens are reachable while signed out; anything else is not.
+      AuthStatus.unauthenticated => isAuthRoute ? null : Routes.login,
       AuthStatus.authenticated =>
-        location == Routes.login || location == Routes.splash
-            ? Routes.home
-            : null,
+        isAuthRoute || location == Routes.splash ? Routes.home : null,
     };
   },
   routes: <RouteBase>[
@@ -43,6 +44,11 @@ GoRouter createRouter(AuthBloc authBloc) => GoRouter(
       path: Routes.login,
       name: Routes.loginName,
       builder: (context, state) => const LoginPage(),
+    ),
+    GoRoute(
+      path: Routes.register,
+      name: Routes.registerName,
+      builder: (context, state) => const RegisterPage(),
     ),
     GoRoute(
       path: Routes.home,

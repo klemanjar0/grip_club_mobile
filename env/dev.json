@@ -1,7 +1,7 @@
 {
   "FLAVOR": "dev",
   "APP_NAME": "Grip Club Dev",
-  "API_BASE_URL": "https://dummyjson.com",
+  "API_BASE_URL": "http://localhost:8080/api/v1",
   "API_CONNECT_TIMEOUT_MS": 15000,
   "ENABLE_HTTP_LOGGING": true
 }

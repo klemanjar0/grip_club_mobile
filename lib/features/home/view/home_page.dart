@@ -28,11 +28,7 @@ class HomePage extends StatelessWidget {
         children: [
           Card(
             child: ListTile(
-              leading: user?.imageUrl == null
-                  ? const Icon(Icons.person)
-                  : CircleAvatar(
-                      backgroundImage: NetworkImage(user!.imageUrl!),
-                    ),
+              leading: const CircleAvatar(child: Icon(Icons.person)),
               title: Text(user?.displayName ?? 'Unknown user'),
               subtitle: Text(user?.email ?? ''),
             ),
