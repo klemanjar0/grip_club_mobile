@@ -1,0 +1,37 @@
+# flutter_flavorizr configuration.
+#
+# Only the iOS processors are used (see `instructions`): generating the six Xcode
+# build configurations (Debug/Profile/Release x dev/prod) and the two schemes by hand
+# in project.pbxproj is error-prone, so that part is delegated to flavorizr.
+#
+# The Android flavors (android/app/build.gradle.kts) and all Dart code are
+# hand-written — do NOT add android:* or flutter:* instructions here, they would
+# overwrite those files with flavorizr's own template.
+#
+# Re-run with: dart run flutter_flavorizr
+app:
+  android:
+    flavorDimensions: "env"
+
+flavors:
+  dev:
+    app:
+      name: "Grip Club Dev"
+    android:
+      applicationId: "com.gripclub.mobile.dev"
+    ios:
+      bundleId: "com.gripclub.mobile.dev"
+  prod:
+    app:
+      name: "Grip Club"
+    android:
+      applicationId: "com.gripclub.mobile"
+    ios:
+      bundleId: "com.gripclub.mobile"
+
+instructions:
+  - ios:xcconfig
+  - ios:buildTargets
+  - ios:schema
+  - ios:plist
+  - ios:podfile

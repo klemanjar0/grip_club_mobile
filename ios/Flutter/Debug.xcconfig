@@ -1,0 +1,6 @@
+#include "Generated.xcconfig"
+
+// Fallback app name for the flavorless `Runner` scheme. Real builds use the
+// dev*/prod*.xcconfig files, which override these.
+BUNDLE_NAME=Grip Club
+BUNDLE_DISPLAY_NAME=Grip Club
