@@ -12,6 +12,17 @@ final class LobbyDetailRequested extends LobbyDetailEvent {
   const LobbyDetailRequested();
 }
 
+/// The edit form saved and handed back the updated lobby. `PATCH` returns the
+/// new state in full, so there is nothing to re-read.
+final class LobbyDetailUpdated extends LobbyDetailEvent {
+  const LobbyDetailUpdated(this.lobby);
+
+  final Lobby lobby;
+
+  @override
+  List<Object?> get props => [lobby];
+}
+
 /// Public lobby → approved on the spot; private → a request the admin reviews.
 final class LobbyDetailJoinRequested extends LobbyDetailEvent {
   const LobbyDetailJoinRequested();

@@ -9,10 +9,12 @@ import 'package:grip_club_mobile/core/storage/token_storage.dart';
 import 'package:grip_club_mobile/features/auth/bloc/auth_bloc.dart';
 import 'package:grip_club_mobile/features/auth/data/auth_repository.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/create_lobby_bloc.dart';
+import 'package:grip_club_mobile/features/lobbies/bloc/edit_lobby_bloc.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/lobby_detail_bloc.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/lobby_feed_bloc.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/lobby_feed_event.dart';
 import 'package:grip_club_mobile/features/lobbies/data/lobby_repository.dart';
+import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 import 'package:grip_club_mobile/features/members/data/membership_repository.dart';
 import 'package:grip_club_mobile/features/notifications/bloc/notifications_badge_bloc.dart';
 import 'package:grip_club_mobile/features/notifications/bloc/notifications_bloc.dart';
@@ -58,10 +60,16 @@ Future<void> configureDependencies() async {
     // Mount them with `BlocProvider.value` so no page closes them, and clear
     // them on sign-out — see [clearSessionCaches].
     ..registerLazySingleton<LobbiesBloc>(
-      () => LobbiesBloc(repository: getIt<LobbyRepository>()),
+      () => LobbiesBloc(
+        repository: getIt<LobbyRepository>(),
+        memberships: getIt<MembershipRepository>(),
+      ),
     )
     ..registerLazySingleton<MyLobbiesBloc>(
-      () => MyLobbiesBloc(repository: getIt<LobbyRepository>()),
+      () => MyLobbiesBloc(
+        repository: getIt<LobbyRepository>(),
+        memberships: getIt<MembershipRepository>(),
+      ),
     )
     ..registerLazySingleton<NotificationsBadgeBloc>(
       () => NotificationsBadgeBloc(repository: getIt<NotificationRepository>()),
@@ -77,11 +85,19 @@ Future<void> configureDependencies() async {
     ..registerFactory<CreateLobbyBloc>(
       () => CreateLobbyBloc(repository: getIt<LobbyRepository>()),
     )
-    ..registerFactoryParam<LobbyDetailBloc, String, void>(
-      (lobbyId, _) => LobbyDetailBloc(
+    ..registerFactoryParam<EditLobbyBloc, String, Lobby?>(
+      (lobbyId, initialLobby) => EditLobbyBloc(
+        lobbyId: lobbyId,
+        repository: getIt<LobbyRepository>(),
+        initialLobby: initialLobby,
+      ),
+    )
+    ..registerFactoryParam<LobbyDetailBloc, String, Lobby?>(
+      (lobbyId, initialLobby) => LobbyDetailBloc(
         lobbyId: lobbyId,
         lobbies: getIt<LobbyRepository>(),
         memberships: getIt<MembershipRepository>(),
+        initialLobby: initialLobby,
       ),
     )
     ..registerFactory<ProfileBloc>(

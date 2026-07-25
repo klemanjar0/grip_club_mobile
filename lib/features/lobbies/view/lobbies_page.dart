@@ -30,6 +30,7 @@ class LobbiesPage extends StatelessWidget {
               const _LobbyFilterBar(),
               const Expanded(
                 child: LobbyFeedView<LobbiesBloc>(
+                  canJoin: true,
                   emptyTitle: 'No lobbies here yet',
                   emptySubtitle:
                       'Try a wider time window or a different city — or create '

@@ -2,7 +2,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:grip_club_mobile/core/network/api_exception.dart';
 import 'package:grip_club_mobile/features/lobbies/data/lobby_repository.dart';
+import 'package:grip_club_mobile/core/patch/optional.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
+import 'package:grip_club_mobile/features/lobbies/domain/lobby_draft.dart';
 
 import '../../helpers/lobby_fixtures.dart';
 import '../../helpers/stub_adapter.dart';
@@ -135,6 +137,90 @@ void main() {
     });
   });
 
+  group('update', () {
+    const path = '/lobbies/a1b2c3d4-0000-4000-8000-000000000001';
+    const lobbyId = 'a1b2c3d4-0000-4000-8000-000000000001';
+
+    test('sends only the keys it is given', () async {
+      final repository = repositoryWith(<String, Stub>{
+        path: Stub(200, lobbyJson(role: 'admin', canJoin: false)),
+      });
+
+      await repository.update(lobbyId, name: 'Friday night climb');
+
+      final request = adapter.requests.single;
+      expect(request.method, 'PATCH');
+      expect(request.data, <String, dynamic>{'name': 'Friday night climb'});
+    });
+
+    test('an omitted clearable field stays out of the body entirely', () async {
+      final repository = repositoryWith(<String, Stub>{
+        path: Stub(200, lobbyJson(role: 'admin', canJoin: false)),
+      });
+
+      await repository.update(lobbyId, city: 'Lviv');
+
+      final body = adapter.requests.single.data! as Map<String, dynamic>;
+      // Absent means "leave it alone" — sending an explicit null would erase it.
+      expect(body.containsKey('description'), isFalse);
+      expect(body.containsKey('address'), isFalse);
+      expect(body.containsKey('chat_link'), isFalse);
+    });
+
+    test(
+      'Optional.clear() sends a present null, which erases the field',
+      () async {
+        final repository = repositoryWith(<String, Stub>{
+          path: Stub(200, lobbyJson(role: 'admin', canJoin: false)),
+        });
+
+        await repository.update(
+          lobbyId,
+          description: const Optional<String>.clear(),
+          address: const Optional('12 Khreshchatyk'),
+        );
+
+        final body = adapter.requests.single.data! as Map<String, dynamic>;
+        // The key must be there *carrying* null: that is what clears it.
+        expect(body.containsKey('description'), isTrue);
+        expect(body['description'], isNull);
+        expect(body['address'], '12 Khreshchatyk');
+      },
+    );
+
+    test('sends event_time as UTC and visibility as its wire value', () async {
+      final repository = repositoryWith(<String, Stub>{
+        path: Stub(200, lobbyJson(role: 'admin', canJoin: false)),
+      });
+
+      await repository.update(
+        lobbyId,
+        eventTime: DateTime.utc(2099, 8, 24, 18, 30),
+        visibility: LobbyVisibility.private,
+      );
+
+      expect(adapter.requests.single.data, <String, dynamic>{
+        'event_time': '2099-08-24T18:30:00.000Z',
+        'visibility': 'private',
+      });
+    });
+
+    test('surfaces admin_only', () async {
+      final repository = repositoryWith(<String, Stub>{
+        path: Stub(403, errorBody('admin_only', 'Only the admin may edit.')),
+      });
+
+      await expectLater(
+        repository.update(lobbyId, name: 'Nope'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.code, 'code', 'admin_only')
+              .having((e) => e.statusCode, 'statusCode', 403),
+        ),
+      );
+    });
+  });
+
   group('create', () {
     test('trims fields, drops blank optionals and sends UTC', () async {
       final repository = repositoryWith(<String, Stub>{
@@ -142,14 +228,16 @@ void main() {
       });
 
       final lobby = await repository.create(
-        name: '  Thursday night climb  ',
-        country: ' Ukraine ',
-        city: ' Kyiv ',
-        eventTime: DateTime.utc(2099, 8, 24, 18, 30),
-        visibility: LobbyVisibility.private,
-        description: '   ',
-        address: ' 12 Khreshchatyk ',
-        chatLink: '',
+        LobbyDraft.fromInput(
+          name: '  Thursday night climb  ',
+          country: ' Ukraine ',
+          city: ' Kyiv ',
+          eventTime: DateTime.utc(2099, 8, 24, 18, 30),
+          visibility: LobbyVisibility.private,
+          description: '   ',
+          address: ' 12 Khreshchatyk ',
+          chatLink: '',
+        ),
       );
 
       final body = adapter.requests.single.data! as Map<String, dynamic>;
@@ -180,11 +268,13 @@ void main() {
 
       await expectLater(
         repository.create(
-          name: 'Climb',
-          country: 'Ukraine',
-          city: 'Kyiv',
-          eventTime: DateTime.utc(2020),
-          visibility: LobbyVisibility.public,
+          LobbyDraft.fromInput(
+            name: 'Climb',
+            country: 'Ukraine',
+            city: 'Kyiv',
+            eventTime: DateTime.utc(2020),
+            visibility: LobbyVisibility.public,
+          ),
         ),
         throwsA(
           isA<ApiException>().having(

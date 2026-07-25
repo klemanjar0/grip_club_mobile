@@ -4,6 +4,9 @@ import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 
 enum LobbyFeedStatus { initial, loading, ready, failure }
 
+/// The result of joining from a card, for the confirmation snackbar.
+enum LobbyJoinOutcome { joined, requestSent }
+
 /// State shared by the two lobby feeds (`/lobbies` and `/me/lobbies`).
 ///
 /// [page] is the last page successfully loaded, zero-based; the next request
@@ -20,6 +23,8 @@ class LobbyFeedState extends Equatable {
     this.errorMessage,
     this.city,
     this.within,
+    this.joiningLobbyId,
+    this.joinOutcome,
   });
 
   final LobbyFeedStatus status;
@@ -38,6 +43,14 @@ class LobbyFeedState extends Equatable {
   final String? city;
   final String? within;
 
+  /// The card whose join is in flight — only one at a time, and only that
+  /// card's button shows a spinner.
+  final String? joiningLobbyId;
+
+  /// Set once a join succeeds, so the view can confirm it. Cleared on the next
+  /// action.
+  final LobbyJoinOutcome? joinOutcome;
+
   bool get isEmpty => status == LobbyFeedStatus.ready && lobbies.isEmpty;
 
   LobbyFeedState copyWith({
@@ -50,6 +63,9 @@ class LobbyFeedState extends Equatable {
     bool clearError = false,
     String? city,
     String? within,
+    String? joiningLobbyId,
+    LobbyJoinOutcome? joinOutcome,
+    bool clearJoining = false,
   }) => LobbyFeedState(
     status: status ?? this.status,
     lobbies: lobbies ?? this.lobbies,
@@ -59,6 +75,8 @@ class LobbyFeedState extends Equatable {
     errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
     city: city ?? this.city,
     within: within ?? this.within,
+    joiningLobbyId: clearJoining ? null : joiningLobbyId ?? this.joiningLobbyId,
+    joinOutcome: clearJoining ? joinOutcome : joinOutcome ?? this.joinOutcome,
   );
 
   @override
@@ -71,5 +89,7 @@ class LobbyFeedState extends Equatable {
     errorMessage,
     city,
     within,
+    joiningLobbyId,
+    joinOutcome,
   ];
 }

@@ -10,7 +10,9 @@ import 'package:grip_club_mobile/features/auth/view/login_page.dart';
 import 'package:grip_club_mobile/features/auth/view/register_page.dart';
 import 'package:grip_club_mobile/features/auth/view/splash_page.dart';
 import 'package:grip_club_mobile/features/dashboard/view/dashboard_page.dart';
+import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 import 'package:grip_club_mobile/features/lobbies/view/create_lobby_page.dart';
+import 'package:grip_club_mobile/features/lobbies/view/edit_lobby_page.dart';
 import 'package:grip_club_mobile/features/lobbies/view/lobbies_page.dart';
 import 'package:grip_club_mobile/features/lobbies/view/lobby_detail_page.dart';
 import 'package:grip_club_mobile/features/lobbies/view/my_lobbies_page.dart';
@@ -112,8 +114,22 @@ GoRouter createRouter(AuthBloc authBloc) => GoRouter(
       path: Routes.lobbyDetail,
       name: Routes.lobbyDetailName,
       parentNavigatorKey: _rootNavigatorKey,
-      builder: (context, state) =>
-          LobbyDetailPage(lobbyId: state.pathParameters['lobbyId'] ?? ''),
+      // `extra` is the feed's copy of the lobby, when the page was opened from
+      // a list. It is an optimisation, not a requirement: a deep link arrives
+      // without it and the page fetches instead.
+      builder: (context, state) => LobbyDetailPage(
+        lobbyId: state.pathParameters['lobbyId'] ?? '',
+        initialLobby: state.extra is Lobby ? state.extra! as Lobby : null,
+      ),
+    ),
+    GoRoute(
+      path: Routes.editLobby,
+      name: Routes.editLobbyName,
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => EditLobbyPage(
+        lobbyId: state.pathParameters['lobbyId'] ?? '',
+        initialLobby: state.extra is Lobby ? state.extra! as Lobby : null,
+      ),
     ),
     GoRoute(
       path: Routes.createLobby,

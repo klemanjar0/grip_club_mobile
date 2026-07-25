@@ -6,6 +6,7 @@ import 'package:grip_club_mobile/core/network/api_exception.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/create_lobby_bloc.dart';
 import 'package:grip_club_mobile/features/lobbies/data/lobby_repository.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
+import 'package:grip_club_mobile/features/lobbies/domain/lobby_draft.dart';
 
 import '../../helpers/lobby_fixtures.dart';
 
@@ -13,7 +14,7 @@ class _MockLobbyRepository extends Mock implements LobbyRepository {}
 
 final _created = lobby(role: 'admin', canJoin: false);
 
-final _submitted = CreateLobbySubmitted(
+final _draft = LobbyDraft.fromInput(
   name: 'Thursday night climb',
   country: 'Ukraine',
   city: 'Kyiv',
@@ -21,30 +22,18 @@ final _submitted = CreateLobbySubmitted(
   visibility: LobbyVisibility.public,
 );
 
+final _submitted = CreateLobbySubmitted(_draft);
+
 void main() {
   late LobbyRepository repository;
 
-  // `any(named:)` needs a sample value for every non-primitive argument type.
-  setUpAll(() {
-    registerFallbackValue(DateTime.utc(2099));
-    registerFallbackValue(LobbyVisibility.public);
-  });
+  // `any()` needs a sample value for every non-primitive argument type.
+  setUpAll(() => registerFallbackValue(_draft));
 
   setUp(() => repository = _MockLobbyRepository());
 
   void stubCreate({Object? throws, Lobby? returns}) {
-    final call = when(
-      () => repository.create(
-        name: any(named: 'name'),
-        country: any(named: 'country'),
-        city: any(named: 'city'),
-        eventTime: any(named: 'eventTime'),
-        visibility: any(named: 'visibility'),
-        description: any(named: 'description'),
-        address: any(named: 'address'),
-        chatLink: any(named: 'chatLink'),
-      ),
-    );
+    final call = when(() => repository.create(any()));
 
     if (throws != null) {
       call.thenThrow(throws);
@@ -62,18 +51,7 @@ void main() {
       const CreateLobbyState.submitting(),
       CreateLobbyState.success(_created),
     ],
-    verify: (_) => verify(
-      () => repository.create(
-        name: 'Thursday night climb',
-        country: 'Ukraine',
-        city: 'Kyiv',
-        eventTime: DateTime.utc(2099, 8, 24, 18, 30),
-        visibility: LobbyVisibility.public,
-        description: null,
-        address: null,
-        chatLink: null,
-      ),
-    ).called(1),
+    verify: (_) => verify(() => repository.create(_draft)).called(1),
   );
 
   blocTest<CreateLobbyBloc, CreateLobbyState>(

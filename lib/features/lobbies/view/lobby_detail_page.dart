@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:grip_club_mobile/app/di/injector.dart';
+import 'package:grip_club_mobile/app/router/routes.dart';
 import 'package:grip_club_mobile/core/format/event_time_format.dart';
 import 'package:grip_club_mobile/core/ui/status_views.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/lobby_detail_bloc.dart';
@@ -12,15 +13,19 @@ import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 ///
 /// Admin tools (members, edit, delete, invite) are not here yet.
 class LobbyDetailPage extends StatelessWidget {
-  const LobbyDetailPage({required this.lobbyId, super.key});
+  const LobbyDetailPage({required this.lobbyId, this.initialLobby, super.key});
 
   final String lobbyId;
+
+  /// The copy the feed already had, when the page was opened from a list.
+  /// Absent on a deep link or a notification tap.
+  final Lobby? initialLobby;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider<LobbyDetailBloc>(
       create: (_) =>
-          getIt<LobbyDetailBloc>(param1: lobbyId)
+          getIt<LobbyDetailBloc>(param1: lobbyId, param2: initialLobby)
             ..add(const LobbyDetailRequested()),
       child: const _LobbyDetailView(),
     );
@@ -38,6 +43,20 @@ class _LobbyDetailView extends StatelessWidget {
     LobbyDetailOutcome.requestWithdrawn => 'Request withdrawn.',
   };
 
+  /// Opens the edit form and takes the saved lobby back from it. `PATCH`
+  /// answers with the updated lobby in full, so nothing needs re-reading.
+  Future<void> _edit(BuildContext context, Lobby lobby) async {
+    final bloc = context.read<LobbyDetailBloc>();
+
+    final saved = await context.pushNamed<Lobby>(
+      Routes.editLobbyName,
+      pathParameters: <String, String>{'lobbyId': lobby.id},
+      extra: lobby,
+    );
+
+    if (saved != null) bloc.add(LobbyDetailUpdated(saved));
+  }
+
   Widget _body(BuildContext context, LobbyDetailState state) {
     final lobby = state.lobby;
 
@@ -46,6 +65,18 @@ class _LobbyDetailView extends StatelessWidget {
     if (lobby != null) return _LobbyBody(lobby: lobby);
 
     if (state.status == LobbyDetailStatus.failure) {
+      // Not a broken request — the lobby exists and is simply closed until the
+      // caller joins it. Offering "Retry" would just fail again; offering the
+      // join is the way through. Whether it lets them straight in or only sends
+      // a request is the server's call, and unknowable from here: the details
+      // that would say which are exactly what is being withheld.
+      if (state.isRestricted) {
+        return _RestrictedView(
+          isActing: state.isActing,
+          hasPendingRequest: state.outcome == LobbyDetailOutcome.requestSent,
+        );
+      }
+
       return ErrorRetryView(
         message: state.errorMessage ?? 'Could not load this lobby.',
         onRetry: () =>
@@ -89,13 +120,77 @@ class _LobbyDetailView extends StatelessWidget {
         final lobby = state.lobby;
 
         return Scaffold(
-          appBar: AppBar(title: Text(lobby?.name ?? 'Lobby')),
+          appBar: AppBar(
+            title: Text(lobby?.name ?? 'Lobby'),
+            actions: [
+              // Editing is the admin's only tool here so far; deleting the
+              // lobby and reviewing join requests are still to come.
+              if (lobby != null && lobby.viewer.isAdmin)
+                IconButton(
+                  tooltip: 'Edit lobby',
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: () => _edit(context, lobby),
+                ),
+            ],
+          ),
           body: SafeArea(child: _body(context, state)),
           bottomNavigationBar: lobby == null
               ? null
               : _LobbyAction(lobby: lobby, isActing: state.isActing),
         );
       },
+    );
+  }
+}
+
+/// Shown when the lobby is real but closed to the caller and the feed's copy
+/// was not carried in — a deep link, or a tap on a notification.
+///
+/// There is nothing to describe, so the page offers the one thing that changes
+/// the situation.
+class _RestrictedView extends StatelessWidget {
+  const _RestrictedView({
+    required this.isActing,
+    required this.hasPendingRequest,
+  });
+
+  final bool isActing;
+
+  /// The join turned out to be a request, and it is still waiting. The lobby
+  /// stays closed until the organizer answers.
+  final bool hasPendingRequest;
+
+  @override
+  Widget build(BuildContext context) {
+    if (hasPendingRequest) {
+      return const EmptyStateView(
+        icon: Icons.hourglass_empty,
+        title: 'Request sent',
+        subtitle:
+            'The organizer will review it. The lobby opens up once you are '
+            'approved.',
+      );
+    }
+
+    return EmptyStateView(
+      icon: Icons.lock_outline,
+      title: 'Members only',
+      subtitle:
+          'Join to see the schedule, the exact address and the group chat. '
+          'A private lobby will ask its organizer first.',
+      action: FilledButton(
+        onPressed: isActing
+            ? null
+            : () => context.read<LobbyDetailBloc>().add(
+                const LobbyDetailJoinRequested(),
+              ),
+        child: isActing
+            ? const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Text('Join lobby'),
+      ),
     );
   }
 }

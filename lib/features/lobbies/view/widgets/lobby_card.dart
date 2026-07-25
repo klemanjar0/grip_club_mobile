@@ -5,10 +5,23 @@ import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 
 /// One lobby in a feed. Shared by the browse and My Lobbies tabs.
 class LobbyCard extends StatelessWidget {
-  const LobbyCard({required this.lobby, required this.onTap, super.key});
+  const LobbyCard({
+    required this.lobby,
+    required this.onTap,
+    this.onJoin,
+    this.isJoining = false,
+    super.key,
+  });
 
   final Lobby lobby;
   final VoidCallback onTap;
+
+  /// Supplied by the browse feed only. My Lobbies leaves it null — every lobby
+  /// there is already the caller's.
+  final VoidCallback? onJoin;
+
+  /// This card's join is in flight.
+  final bool isJoining;
 
   @override
   Widget build(BuildContext context) {
@@ -75,11 +88,38 @@ class LobbyCard extends StatelessWidget {
                   ...?_roleChip(context),
                 ],
               ),
+              ...?_joinButton(context),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// Join straight from the list, without opening the lobby first.
+  ///
+  /// A public lobby lets you in on the spot; a private one only sends the
+  /// organizer a request, and the label says so rather than promising entry.
+  /// Absent for anyone the server says cannot join — members, admins, pending
+  /// applicants and banned users all have `can_join: false`.
+  List<Widget>? _joinButton(BuildContext context) {
+    if (onJoin == null || !lobby.viewer.canJoin) return null;
+
+    return [
+      const SizedBox(height: 12),
+      SizedBox(
+        width: double.infinity,
+        child: FilledButton.tonal(
+          onPressed: isJoining ? null : onJoin,
+          child: isJoining
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(lobby.isPrivate ? 'Request to join' : 'Join'),
+        ),
+      ),
+    ];
   }
 
   /// Only shown once the viewer has some standing in the lobby — an outsider

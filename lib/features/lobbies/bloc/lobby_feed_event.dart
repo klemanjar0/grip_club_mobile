@@ -25,6 +25,19 @@ final class LobbyFeedNextPageRequested extends LobbyFeedEvent {
   const LobbyFeedNextPageRequested();
 }
 
+/// Joins straight from a card, without opening the lobby first.
+///
+/// Public lobbies approve on the spot; private ones leave a request for the
+/// admin to answer. Read the resulting status off the lobby in the feed.
+final class LobbyFeedJoinRequested extends LobbyFeedEvent {
+  const LobbyFeedJoinRequested(this.lobbyId);
+
+  final String lobbyId;
+
+  @override
+  List<Object?> get props => [lobbyId];
+}
+
 /// Drops everything loaded, filters included, and returns the feed to its
 /// initial state. Dispatched on sign-out: these blocs outlive a session.
 final class LobbyFeedCleared extends LobbyFeedEvent {

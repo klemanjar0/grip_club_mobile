@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:grip_club_mobile/app/di/injector.dart';
+import 'package:grip_club_mobile/core/network/api_exception.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 import 'package:grip_club_mobile/features/lobbies/view/lobby_detail_page.dart';
 import 'package:grip_club_mobile/features/members/domain/membership.dart';
@@ -19,9 +20,11 @@ void main() {
 
   tearDown(() async => getIt.reset());
 
-  Future<void> pumpDetail(WidgetTester tester) async {
+  Future<void> pumpDetail(WidgetTester tester, {Lobby? initialLobby}) async {
     await tester.pumpWidget(
-      const MaterialApp(home: LobbyDetailPage(lobbyId: _lobbyId)),
+      MaterialApp(
+        home: LobbyDetailPage(lobbyId: _lobbyId, initialLobby: initialLobby),
+      ),
     );
     await tester.pumpAndSettle();
   }
@@ -89,6 +92,30 @@ void main() {
     expect(find.text('Join lobby'), findsNothing);
   });
 
+  testWidgets('the admin is offered the edit action', (tester) async {
+    when(() => mocks.lobbies.byId(_lobbyId)).thenAnswer(
+      (_) async => Lobby.fromJson(
+        lobbyJson(role: 'admin', membershipStatus: 'approved', canJoin: false),
+      ),
+    );
+
+    await pumpDetail(tester);
+
+    expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+  });
+
+  testWidgets('a member is not', (tester) async {
+    when(() => mocks.lobbies.byId(_lobbyId)).thenAnswer(
+      (_) async => Lobby.fromJson(
+        lobbyJson(role: 'member', membershipStatus: 'approved', canJoin: false),
+      ),
+    );
+
+    await pumpDetail(tester);
+
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
+  });
+
   testWidgets('an admin gets no membership action', (tester) async {
     when(() => mocks.lobbies.byId(_lobbyId)).thenAnswer(
       (_) async => Lobby.fromJson(
@@ -101,6 +128,79 @@ void main() {
     // Admins cannot leave their own lobby; deleting it is the follow-up pass.
     expect(find.text('Leave lobby'), findsNothing);
     expect(find.text('Join lobby'), findsNothing);
+  });
+
+  group('when the lobby is closed to the caller', () {
+    const notAMember = ApiException(
+      'Join the lobby to see its details.',
+      statusCode: 403,
+      code: 'not_a_member',
+    );
+
+    testWidgets('the feed\'s copy still renders, with its join button', (
+      tester,
+    ) async {
+      // `GET /lobbies/{id}` shuts outsiders out, but the browse feed already
+      // handed the page everything it needs.
+      when(() => mocks.lobbies.byId(_lobbyId)).thenThrow(notAMember);
+
+      await pumpDetail(
+        tester,
+        initialLobby: Lobby.fromJson(lobbyJson(visibility: 'private')),
+      );
+
+      expect(find.text('Request to join'), findsOneWidget);
+      expect(find.text('Thursday night climb'), findsWidgets);
+      // Nothing failed as far as the reader is concerned.
+      expect(find.text('Retry'), findsNothing);
+    });
+
+    testWidgets('a deep link offers the join instead of a retry', (
+      tester,
+    ) async {
+      when(() => mocks.lobbies.byId(_lobbyId)).thenThrow(notAMember);
+
+      await pumpDetail(tester);
+
+      expect(find.text('Members only'), findsOneWidget);
+      expect(find.text('Join lobby'), findsOneWidget);
+      // Retrying a 403 would just 403 again.
+      expect(find.text('Retry'), findsNothing);
+    });
+
+    testWidgets('a real failure still offers a retry', (tester) async {
+      when(
+        () => mocks.lobbies.byId(_lobbyId),
+      ).thenThrow(const ApiException('No internet connection.'));
+
+      await pumpDetail(tester);
+
+      expect(find.text('Retry'), findsOneWidget);
+      expect(find.text('Join lobby'), findsNothing);
+    });
+
+    testWidgets('requesting from a deep link leaves it pending, not broken', (
+      tester,
+    ) async {
+      when(() => mocks.lobbies.byId(_lobbyId)).thenThrow(notAMember);
+      when(() => mocks.memberships.join(_lobbyId)).thenAnswer(
+        (_) async => Membership(
+          lobbyId: _lobbyId,
+          userId: 'u1',
+          status: MembershipStatus.pending,
+          joinedAt: DateTime.utc(2026, 8, 24),
+        ),
+      );
+
+      await pumpDetail(tester);
+      await tester.tap(find.text('Join lobby'));
+      await tester.pumpAndSettle();
+
+      // The lobby stays unreadable until the organizer approves, so the page
+      // says so rather than bouncing the reader out.
+      expect(find.text('Request sent'), findsOneWidget);
+      expect(find.text('Join lobby'), findsNothing);
+    });
   });
 
   testWidgets('a banned viewer is told, not offered a doomed button', (

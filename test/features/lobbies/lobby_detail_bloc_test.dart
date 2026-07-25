@@ -58,7 +58,7 @@ void main() {
     );
 
     blocTest<LobbyDetailBloc, LobbyDetailState>(
-      'keeps the error code so the view can tell 403 from 404',
+      'flags a 403 as restricted rather than as a failure to retry',
       setUp: () => when(() => lobbies.byId(_lobbyId)).thenThrow(
         const ApiException(
           'Join the lobby to see its details.',
@@ -74,7 +74,53 @@ void main() {
           status: LobbyDetailStatus.failure,
           errorMessage: 'Join the lobby to see its details.',
           errorCode: 'not_a_member',
+          isRestricted: true,
         ),
+      ],
+    );
+
+    blocTest<LobbyDetailBloc, LobbyDetailState>(
+      'a 404 is a plain failure, not a restriction',
+      setUp: () => when(() => lobbies.byId(_lobbyId)).thenThrow(
+        const ApiException(
+          'No such lobby.',
+          statusCode: 404,
+          code: 'lobby_not_found',
+        ),
+      ),
+      build: build,
+      act: (bloc) => bloc.add(const LobbyDetailRequested()),
+      skip: 1,
+      expect: () => const [
+        LobbyDetailState(
+          status: LobbyDetailStatus.failure,
+          errorMessage: 'No such lobby.',
+          errorCode: 'lobby_not_found',
+        ),
+      ],
+    );
+
+    blocTest<LobbyDetailBloc, LobbyDetailState>(
+      'keeps the feed\'s copy when the server locks the caller out',
+      setUp: () => when(() => lobbies.byId(_lobbyId)).thenThrow(
+        const ApiException(
+          'Join the lobby to see its details.',
+          statusCode: 403,
+          code: 'not_a_member',
+        ),
+      ),
+      build: () => LobbyDetailBloc(
+        lobbyId: _lobbyId,
+        lobbies: lobbies,
+        memberships: memberships,
+        initialLobby: _asOutsider,
+      ),
+      act: (bloc) => bloc.add(const LobbyDetailRequested()),
+      // The page stays readable and no error reaches the reader: the copy from
+      // the list is exactly what they were already looking at.
+      expect: () => [
+        LobbyDetailState(status: LobbyDetailStatus.loading, lobby: _asOutsider),
+        LobbyDetailState(status: LobbyDetailStatus.ready, lobby: _asOutsider),
       ],
     );
   });

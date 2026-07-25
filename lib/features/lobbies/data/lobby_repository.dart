@@ -2,23 +2,16 @@ import 'package:dio/dio.dart';
 
 import 'package:grip_club_mobile/core/network/api_exception.dart';
 import 'package:grip_club_mobile/core/pagination/page_envelope.dart';
+import 'package:grip_club_mobile/core/patch/optional.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
+import 'package:grip_club_mobile/features/lobbies/domain/lobby_draft.dart';
 
-/// Talks to the lobby endpoints.
-///
-/// Throws [ApiException] only — [DioException] never escapes this layer.
 class LobbyRepository {
   // Private field formal: callers still pass `dio:`.
   const LobbyRepository({required this._dio});
 
   final Dio _dio;
 
-  /// `GET /lobbies` — upcoming public lobbies, soonest first.
-  ///
-  /// Passing `null` for [city] or [within] **omits the parameter**, which makes
-  /// the server fall back to the user's saved preferences. To browse
-  /// everywhere, pass an empty [city] instead: `?city=` explicitly overrides a
-  /// saved city.
   Future<PageEnvelope<Lobby>> browse({
     String? city,
     String? within,
@@ -31,7 +24,6 @@ class LobbyRepository {
     'page_size': pageSize,
   });
 
-  /// `GET /me/lobbies` — created or approved, past events included.
   Future<PageEnvelope<Lobby>> myLobbies({
     int page = 0,
     int pageSize = PageEnvelope.defaultPageSize,
@@ -40,10 +32,6 @@ class LobbyRepository {
     'page_size': pageSize,
   });
 
-  /// `GET /lobbies/{id}` — full detail for admins and approved members.
-  ///
-  /// `403 not_a_member` for outsiders and pending applicants; `404
-  /// lobby_not_found` when the id is unknown or not a UUID.
   Future<Lobby> byId(String lobbyId) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -55,34 +43,60 @@ class LobbyRepository {
     }
   }
 
-  /// `POST /lobbies` — the caller becomes the admin and is approved at once.
-  ///
-  /// Blank optional fields are dropped rather than sent as `""`; the server
-  /// stores blanks as `null` anyway, and omitting keeps the payload honest.
-  Future<Lobby> create({
-    required String name,
-    required String country,
-    required String city,
-    required DateTime eventTime,
-    required LobbyVisibility visibility,
-    String? description,
-    String? address,
-    String? chatLink,
-  }) async {
+  Future<Lobby> create(LobbyDraft draft) async {
     final body = <String, dynamic>{
-      'name': name.trim(),
-      'country': country.trim(),
-      'city': city.trim(),
-      'event_time': eventTime.toUtc().toIso8601String(),
-      'visibility': visibility.asJson,
-      'description': ?_blankToNull(description),
-      'address': ?_blankToNull(address),
-      'chat_link': ?_blankToNull(chatLink),
+      'name': draft.name,
+      'country': draft.country,
+      'city': draft.city,
+      'event_time': draft.eventTime.toUtc().toIso8601String(),
+      'visibility': draft.visibility.asJson,
+      'description': ?draft.description,
+      'address': ?draft.address,
+      'chat_link': ?draft.chatLink,
     };
 
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/lobbies',
+        data: body,
+      );
+      return Lobby.fromJson(_require(response.data));
+    } on DioException catch (exception) {
+      throw ApiException.fromDioException(exception);
+    }
+  }
+
+  Future<void> deleteLobby(String lobbyId) async {
+    return Future.value(null);
+  }
+
+  Future<Lobby> update(
+    String lobbyId, {
+    String? name,
+    String? country,
+    String? city,
+    DateTime? eventTime,
+    LobbyVisibility? visibility,
+    Optional<String>? description,
+    Optional<String>? address,
+    Optional<String>? chatLink,
+  }) async {
+    final body = <String, dynamic>{
+      'name': ?name,
+      'country': ?country,
+      'city': ?city,
+      'event_time': ?eventTime?.toUtc().toIso8601String(),
+      'visibility': ?visibility?.asJson,
+      // Present-and-null is the whole point here: the key has to be in the body
+      // carrying `null`, which `?` would drop.
+      if (description != null) 'description': description.value,
+      if (address != null) 'address': address.value,
+      if (chatLink != null) 'chat_link': chatLink.value,
+    };
+
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/lobbies/$lobbyId',
         data: body,
       );
       return Lobby.fromJson(_require(response.data));
@@ -107,13 +121,6 @@ class LobbyRepository {
     } on DioException catch (exception) {
       throw ApiException.fromDioException(exception);
     }
-  }
-
-  /// Trims, then collapses `""` to `null` so the key is dropped entirely.
-  static String? _blankToNull(String? value) {
-    final trimmed = value?.trim();
-
-    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
   static Map<String, dynamic> _require(Map<String, dynamic>? data) {

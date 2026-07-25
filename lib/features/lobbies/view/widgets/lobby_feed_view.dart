@@ -8,6 +8,7 @@ import 'package:grip_club_mobile/core/ui/status_views.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/lobby_feed_bloc.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/lobby_feed_event.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/lobby_feed_state.dart';
+import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 import 'package:grip_club_mobile/features/lobbies/view/widgets/lobby_card.dart';
 
 /// The list half of a lobby tab: loading, empty, error and paged states.
@@ -19,6 +20,7 @@ class LobbyFeedView<B extends LobbyFeedBloc> extends StatelessWidget {
     required this.emptyTitle,
     required this.emptySubtitle,
     this.emptyAction,
+    this.canJoin = false,
     super.key,
   });
 
@@ -26,15 +28,24 @@ class LobbyFeedView<B extends LobbyFeedBloc> extends StatelessWidget {
   final String emptySubtitle;
   final Widget? emptyAction;
 
+  /// Puts a join button on the cards. The browse feed sets it; My Lobbies has
+  /// nothing to join.
+  final bool canJoin;
+
   Future<void> _refresh(BuildContext context) async =>
       context.read<B>().add(const LobbyFeedRefreshed());
 
   /// Opening a lobby can change the viewer's standing in it (they may join, or
   /// leave), so the feed is refreshed when the detail page pops.
-  Future<void> _openLobby(BuildContext context, String lobbyId) async {
+  ///
+  /// The lobby travels along as `extra`: `GET /lobbies/{id}` answers `403` to
+  /// outsiders and pending applicants, and this copy is what lets the detail
+  /// page show them the lobby and a join button instead of an error.
+  Future<void> _openLobby(BuildContext context, Lobby lobby) async {
     await context.pushNamed(
       Routes.lobbyDetailName,
-      pathParameters: <String, String>{'lobbyId': lobbyId},
+      pathParameters: <String, String>{'lobbyId': lobby.id},
+      extra: lobby,
     );
 
     if (context.mounted) await _refresh(context);
@@ -43,15 +54,28 @@ class LobbyFeedView<B extends LobbyFeedBloc> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<B, LobbyFeedState>(
-      // A failure with lobbies already on screen is a failed *next* page: the
-      // list stays put and the message goes to a snackbar instead.
+      // Two things reach the snackbar: a join result, and a failure that has a
+      // loaded list behind it (a failed *next* page — the list stays put).
       listenWhen: (previous, current) =>
-          current.errorMessage != null &&
-          current.lobbies.isNotEmpty &&
-          previous.errorMessage != current.errorMessage,
-      listener: (context, state) => ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(state.errorMessage!))),
+          (previous.joinOutcome != current.joinOutcome &&
+              current.joinOutcome != null) ||
+          (current.errorMessage != null &&
+              current.lobbies.isNotEmpty &&
+              previous.errorMessage != current.errorMessage),
+      listener: (context, state) {
+        final message = switch (state.joinOutcome) {
+          LobbyJoinOutcome.joined => 'You are in.',
+          LobbyJoinOutcome.requestSent =>
+            'Request sent — the organizer will review it.',
+          null => state.errorMessage,
+        };
+
+        if (message == null) return;
+
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(message)));
+      },
       builder: (context, state) {
         if (state.status == LobbyFeedStatus.loading && state.lobbies.isEmpty) {
           return const Center(child: CircularProgressIndicator());
@@ -90,7 +114,12 @@ class LobbyFeedView<B extends LobbyFeedBloc> extends StatelessWidget {
 
             return LobbyCard(
               lobby: lobby,
-              onTap: () => _openLobby(context, lobby.id),
+              onTap: () => _openLobby(context, lobby),
+              isJoining: state.joiningLobbyId == lobby.id,
+              onJoin: canJoin
+                  ? () =>
+                        context.read<B>().add(LobbyFeedJoinRequested(lobby.id))
+                  : null,
             );
           },
         );

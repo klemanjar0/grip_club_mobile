@@ -6,17 +6,21 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:grip_club_mobile/app/di/injector.dart';
 import 'package:grip_club_mobile/app/router/app_router.dart';
+import 'package:grip_club_mobile/core/pagination/page_envelope.dart';
 import 'package:grip_club_mobile/features/auth/bloc/auth_bloc.dart';
 import 'package:grip_club_mobile/features/auth/data/auth_repository.dart';
 import 'package:grip_club_mobile/features/auth/domain/user.dart';
+import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 import 'package:grip_club_mobile/features/lobbies/view/create_lobby_page.dart';
 import 'package:grip_club_mobile/features/lobbies/view/lobbies_page.dart';
 import 'package:grip_club_mobile/features/lobbies/view/my_lobbies_page.dart';
 import 'package:grip_club_mobile/features/notifications/bloc/notifications_badge_bloc.dart';
 import 'package:grip_club_mobile/features/notifications/view/notifications_page.dart';
+import 'package:grip_club_mobile/features/members/domain/membership.dart';
 import 'package:grip_club_mobile/features/profile/view/profile_page.dart';
 
 import '../../helpers/dashboard_harness.dart';
+import '../../helpers/lobby_fixtures.dart';
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
@@ -136,6 +140,108 @@ void main() {
 
     expect(find.byType(Badge), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
+  });
+
+  group('joining from the browse list', () {
+    final public = Lobby.fromJson(lobbyJson(name: 'Open climb'));
+    final private = Lobby.fromJson(
+      lobbyJson(
+        id: 'a1b2c3d4-0000-4000-8000-000000000002',
+        name: 'Closed climb',
+        visibility: 'private',
+      ),
+    );
+
+    void stubFeed(List<Lobby> lobbies) =>
+        when(
+          () => mocks.lobbies.browse(
+            city: any(named: 'city'),
+            within: any(named: 'within'),
+            page: any(named: 'page'),
+          ),
+        ).thenAnswer(
+          (_) async => PageEnvelope<Lobby>(
+            items: lobbies,
+            page: 0,
+            pageSize: 10,
+            hasNext: false,
+          ),
+        );
+
+    testWidgets('the label says what the button will actually do', (
+      tester,
+    ) async {
+      stubFeed([public, private]);
+
+      await pumpDashboard(tester);
+
+      expect(find.text('Join'), findsOneWidget);
+      expect(find.text('Request to join'), findsOneWidget);
+    });
+
+    testWidgets('joining flips that card without reloading the list', (
+      tester,
+    ) async {
+      stubFeed([public, private]);
+      when(() => mocks.memberships.join(public.id)).thenAnswer(
+        (_) async => Membership(
+          lobbyId: public.id,
+          userId: 'u1',
+          status: MembershipStatus.approved,
+          joinedAt: DateTime.utc(2026, 8, 24),
+        ),
+      );
+
+      await pumpDashboard(tester);
+      await tester.tap(find.text('Join'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('You are in.'), findsOneWidget);
+      expect(find.text('Join'), findsNothing);
+      expect(find.text('Member'), findsOneWidget);
+      // The other card is untouched.
+      expect(find.text('Request to join'), findsOneWidget);
+    });
+
+    testWidgets('a private lobby only sends a request', (tester) async {
+      stubFeed([private]);
+      when(() => mocks.memberships.join(private.id)).thenAnswer(
+        (_) async => Membership(
+          lobbyId: private.id,
+          userId: 'u1',
+          status: MembershipStatus.pending,
+          joinedAt: DateTime.utc(2026, 8, 24),
+        ),
+      );
+
+      await pumpDashboard(tester);
+      await tester.tap(find.text('Request to join'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Request sent — the organizer will review it.'),
+        findsOneWidget,
+      );
+      expect(find.text('Pending'), findsOneWidget);
+    });
+
+    testWidgets('My Lobbies offers no join button', (tester) async {
+      when(() => mocks.lobbies.myLobbies(page: any(named: 'page'))).thenAnswer(
+        (_) async => PageEnvelope<Lobby>(
+          items: [Lobby.fromJson(lobbyJson(role: 'member', canJoin: false))],
+          page: 0,
+          pageSize: 10,
+          hasNext: false,
+        ),
+      );
+
+      await pumpDashboard(tester);
+      await tester.tap(find.byIcon(Icons.groups_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Join'), findsNothing);
+      expect(find.text('Member'), findsOneWidget);
+    });
   });
 
   testWidgets('empty feeds explain themselves', (tester) async {

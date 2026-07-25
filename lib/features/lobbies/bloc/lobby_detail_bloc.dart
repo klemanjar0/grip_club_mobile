@@ -14,13 +14,30 @@ part 'lobby_detail_state.dart';
 /// After a successful join or leave the lobby is re-fetched rather than patched
 /// locally: `viewer.role`, `approved_count`, `address` and `chat_link` all
 /// change server-side, and guessing them here would drift from the API.
+///
+/// [initialLobby] is the copy the feed already had. `GET /lobbies/{id}` answers
+/// `403 not_a_member` to outsiders and pending applicants, so without it there
+/// would be nothing to show the very people who still need to join.
 class LobbyDetailBloc extends Bloc<LobbyDetailEvent, LobbyDetailState> {
   LobbyDetailBloc({
     required this.lobbyId,
     required this._lobbies,
     required this._memberships,
-  }) : super(const LobbyDetailState()) {
+    Lobby? initialLobby,
+  }) : super(
+         initialLobby == null
+             ? const LobbyDetailState()
+             : LobbyDetailState(
+                 status: LobbyDetailStatus.ready,
+                 lobby: initialLobby,
+               ),
+       ) {
     on<LobbyDetailRequested>(_onRequested);
+    on<LobbyDetailUpdated>(
+      (event, emit) => emit(
+        state.copyWith(status: LobbyDetailStatus.ready, lobby: event.lobby),
+      ),
+    );
     on<LobbyDetailJoinRequested>(_onJoinRequested);
     on<LobbyDetailLeaveRequested>(_onLeaveRequested);
   }
@@ -43,11 +60,22 @@ class LobbyDetailBloc extends Bloc<LobbyDetailEvent, LobbyDetailState> {
         ),
       );
     } on ApiException catch (exception) {
+      // Being locked out is not worth reporting when the feed's copy is in
+      // hand: the page renders from that, and `viewer.can_join` still drives
+      // the join button. Only a first load with nothing behind it is a failure
+      // — and the view turns a bare `not_a_member` into a join prompt rather
+      // than a retry button.
+      if (state.lobby != null) {
+        emit(state.copyWith(status: LobbyDetailStatus.ready));
+        return;
+      }
+
       emit(
         state.copyWith(
           status: LobbyDetailStatus.failure,
           errorMessage: exception.message,
           errorCode: exception.code,
+          isRestricted: exception.code == 'not_a_member',
         ),
       );
     }
@@ -63,13 +91,38 @@ class LobbyDetailBloc extends Bloc<LobbyDetailEvent, LobbyDetailState> {
 
     try {
       final membership = await _memberships.join(lobbyId);
+      final outcome = membership.isApproved
+          ? LobbyDetailOutcome.joined
+          : LobbyDetailOutcome.requestSent;
 
-      await _reload(
-        emit,
-        outcome: membership.isApproved
-            ? LobbyDetailOutcome.joined
-            : LobbyDetailOutcome.requestSent,
-      );
+      try {
+        emit(
+          state.copyWith(
+            status: LobbyDetailStatus.ready,
+            lobby: await _lobbies.byId(lobbyId),
+            isActing: false,
+            outcome: outcome,
+          ),
+        );
+      } on ApiException {
+        // Requesting to join a private lobby leaves the caller *pending*, and
+        // `GET /lobbies/{id}` says `403` to a pending applicant — there is
+        // nothing to re-read. Patch the copy on screen instead; unlike leaving,
+        // this is not a reason to close the page. With no copy to patch the
+        // page stays on its members-only state, which now reads as pending.
+        final current = state.lobby;
+
+        emit(
+          state.copyWith(
+            status: current == null
+                ? LobbyDetailStatus.failure
+                : LobbyDetailStatus.ready,
+            lobby: current?.withMembership(membership.status),
+            isActing: false,
+            outcome: outcome,
+          ),
+        );
+      }
     } on ApiException catch (exception) {
       emit(_actionFailed(exception));
     }
@@ -99,7 +152,7 @@ class LobbyDetailBloc extends Bloc<LobbyDetailEvent, LobbyDetailState> {
     }
   }
 
-  /// Re-reads the lobby after a membership change.
+  /// Re-reads the lobby after leaving it.
   ///
   /// Leaving a private lobby costs the caller their access, so the refetch
   /// comes back `403 not_a_member`. That is the expected outcome, not a

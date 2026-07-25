@@ -4,6 +4,7 @@ import 'package:grip_club_mobile/app/di/injector.dart';
 import 'package:grip_club_mobile/core/pagination/page_envelope.dart';
 import 'package:grip_club_mobile/features/auth/data/auth_repository.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/create_lobby_bloc.dart';
+import 'package:grip_club_mobile/features/lobbies/bloc/edit_lobby_bloc.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/lobby_detail_bloc.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/lobby_feed_bloc.dart';
 import 'package:grip_club_mobile/features/lobbies/data/lobby_repository.dart';
@@ -78,9 +79,11 @@ DashboardMocks registerDashboardStubs({AuthRepository? auth}) {
     ..registerSingleton<MembershipRepository>(memberships)
     ..registerSingleton<NotificationRepository>(notifications)
     ..registerSingleton<UserRepository>(users)
-    ..registerLazySingleton<LobbiesBloc>(() => LobbiesBloc(repository: lobbies))
+    ..registerLazySingleton<LobbiesBloc>(
+      () => LobbiesBloc(repository: lobbies, memberships: memberships),
+    )
     ..registerLazySingleton<MyLobbiesBloc>(
-      () => MyLobbiesBloc(repository: lobbies),
+      () => MyLobbiesBloc(repository: lobbies, memberships: memberships),
     )
     ..registerLazySingleton<NotificationsBadgeBloc>(
       () => NotificationsBadgeBloc(repository: notifications),
@@ -94,11 +97,19 @@ DashboardMocks registerDashboardStubs({AuthRepository? auth}) {
     ..registerFactory<CreateLobbyBloc>(
       () => CreateLobbyBloc(repository: lobbies),
     )
-    ..registerFactoryParam<LobbyDetailBloc, String, void>(
-      (lobbyId, _) => LobbyDetailBloc(
+    ..registerFactoryParam<EditLobbyBloc, String, Lobby?>(
+      (lobbyId, initialLobby) => EditLobbyBloc(
+        lobbyId: lobbyId,
+        repository: lobbies,
+        initialLobby: initialLobby,
+      ),
+    )
+    ..registerFactoryParam<LobbyDetailBloc, String, Lobby?>(
+      (lobbyId, initialLobby) => LobbyDetailBloc(
         lobbyId: lobbyId,
         lobbies: lobbies,
         memberships: memberships,
+        initialLobby: initialLobby,
       ),
     );
 

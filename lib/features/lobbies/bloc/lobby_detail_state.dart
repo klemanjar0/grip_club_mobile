@@ -14,6 +14,7 @@ class LobbyDetailState extends Equatable {
     this.errorCode,
     this.outcome,
     this.accessLost = false,
+    this.isRestricted = false,
   });
 
   final LobbyDetailStatus status;
@@ -34,6 +35,11 @@ class LobbyDetailState extends Equatable {
   /// The view pops back to the feed.
   final bool accessLost;
 
+  /// The lobby exists but is closed to the caller (`403 not_a_member`) and no
+  /// copy of it came from a feed. Survives the transient error fields, which a
+  /// join clears: the page has to keep offering the way in.
+  final bool isRestricted;
+
   bool get isLoading => status == LobbyDetailStatus.loading;
 
   LobbyDetailState copyWith({
@@ -44,6 +50,7 @@ class LobbyDetailState extends Equatable {
     String? errorCode,
     LobbyDetailOutcome? outcome,
     bool? accessLost,
+    bool? isRestricted,
     bool clearError = false,
     bool clearOutcome = false,
   }) => LobbyDetailState(
@@ -54,6 +61,7 @@ class LobbyDetailState extends Equatable {
     errorCode: clearError ? null : errorCode ?? this.errorCode,
     outcome: clearOutcome ? null : outcome ?? this.outcome,
     accessLost: accessLost ?? this.accessLost,
+    isRestricted: isRestricted ?? this.isRestricted,
   );
 
   @override
@@ -65,5 +73,6 @@ class LobbyDetailState extends Equatable {
     errorCode,
     outcome,
     accessLost,
+    isRestricted,
   ];
 }

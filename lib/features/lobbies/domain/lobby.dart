@@ -112,6 +112,42 @@ class Lobby extends Equatable {
 
   bool get isPrivate => visibility == LobbyVisibility.private;
 
+  /// The lobby as it looks right after the caller joined it.
+  ///
+  /// A local mirror of what the server just did, for the two spots that cannot
+  /// simply re-read it: a card in the feed (re-reading the whole page would
+  /// throw away the scroll position) and a private lobby the caller is now only
+  /// *pending* on — `GET /lobbies/{id}` answers `403` to a pending applicant, so
+  /// there is nothing to re-read.
+  ///
+  /// [address] and [chatLink] deliberately stay as they were: an approval makes
+  /// the server start sending them, but this copy has not seen them. The next
+  /// refresh fills them in.
+  Lobby withMembership(MembershipStatus status) {
+    final isApproved = status == MembershipStatus.approved;
+
+    return Lobby(
+      id: id,
+      name: name,
+      description: description,
+      country: country,
+      city: city,
+      address: address,
+      eventTime: eventTime,
+      visibility: visibility,
+      approvedCount: isApproved ? approvedCount + 1 : approvedCount,
+      chatLink: chatLink,
+      creator: creator,
+      viewer: LobbyViewer(
+        role: isApproved ? ViewerRole.member : ViewerRole.pending,
+        membershipStatus: status,
+        canJoin: false,
+      ),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
+
   /// True once the event time has passed. `/lobbies` never returns these;
   /// `/me/lobbies` does.
   bool get isPast =>

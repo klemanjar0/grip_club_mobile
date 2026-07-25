@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import 'package:grip_club_mobile/core/network/api_exception.dart';
 import 'package:grip_club_mobile/features/lobbies/data/lobby_repository.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
+import 'package:grip_club_mobile/features/lobbies/domain/lobby_draft.dart';
 
 part 'create_lobby_event.dart';
 part 'create_lobby_state.dart';
@@ -28,18 +29,7 @@ class CreateLobbyBloc extends Bloc<CreateLobbyEvent, CreateLobbyState> {
     emit(const CreateLobbyState.submitting());
 
     try {
-      final lobby = await _repository.create(
-        name: event.name,
-        country: event.country,
-        city: event.city,
-        eventTime: event.eventTime,
-        visibility: event.visibility,
-        description: event.description,
-        address: event.address,
-        chatLink: event.chatLink,
-      );
-
-      emit(CreateLobbyState.success(lobby));
+      emit(CreateLobbyState.success(await _repository.create(event.draft)));
     } on ApiException catch (exception) {
       emit(
         CreateLobbyState.failure(
