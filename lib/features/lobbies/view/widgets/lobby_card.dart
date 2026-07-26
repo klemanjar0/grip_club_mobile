@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:grip_club_mobile/core/format/event_time_format.dart';
+import 'package:grip_club_mobile/core/ui/avatar_image.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 
 /// One lobby in a feed. Shared by the browse and My Lobbies tabs.
@@ -39,7 +40,17 @@ class LobbyCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Not gated by the viewer's role, unlike the address: this is
+                  // the browse feed, and an outsider is meant to see it.
+                  AvatarImage(
+                    size: 56,
+                    image: lobby.avatar,
+                    shape: AvatarShape.rounded,
+                    icon: Icons.image_outlined,
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       lobby.name,
@@ -49,7 +60,7 @@ class LobbyCard extends StatelessWidget {
                     ),
                   ),
                   if (lobby.isPrivate) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(width: 8),
                     Icon(
                       Icons.lock_outline,
                       size: 18,

@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import 'package:grip_club_mobile/core/images/remote_image.dart';
+
 /// Who may see a lobby in the public browse feed.
 enum LobbyVisibility {
   public,
@@ -64,6 +66,7 @@ class Lobby extends Equatable {
     this.description,
     this.address,
     this.chatLink,
+    this.avatar,
     this.createdAt,
     this.updatedAt,
   });
@@ -79,6 +82,7 @@ class Lobby extends Equatable {
     visibility: LobbyVisibility.fromJson(json['visibility']),
     approvedCount: json['approved_count'] as int? ?? 0,
     chatLink: json['chat_link'] as String?,
+    avatar: RemoteImage.fromJson(json['avatar']),
     creator: LobbyCreator.fromJson(json['creator']),
     viewer: LobbyViewer.fromJson(json['viewer']),
     createdAt: DateTime.tryParse(json['created_at'] as String? ?? ''),
@@ -104,6 +108,11 @@ class Lobby extends Equatable {
 
   /// `null` unless the viewer is an admin or an approved member.
   final String? chatLink;
+
+  /// The lobby's picture. Unlike [address] and [chatLink] this is *not* gated
+  /// by the viewer's role — it shows up in the browse feed an outsider sees, so
+  /// it is as public as [name] and [city].
+  final RemoteImage? avatar;
 
   final LobbyCreator creator;
   final LobbyViewer viewer;
@@ -137,6 +146,7 @@ class Lobby extends Equatable {
       visibility: visibility,
       approvedCount: isApproved ? approvedCount + 1 : approvedCount,
       chatLink: chatLink,
+      avatar: avatar,
       creator: creator,
       viewer: LobbyViewer(
         role: isApproved ? ViewerRole.member : ViewerRole.pending,
@@ -165,6 +175,7 @@ class Lobby extends Equatable {
     visibility,
     approvedCount,
     chatLink,
+    avatar,
     creator,
     viewer,
     createdAt,

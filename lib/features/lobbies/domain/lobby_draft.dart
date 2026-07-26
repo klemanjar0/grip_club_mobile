@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import 'package:grip_club_mobile/core/images/avatar_selection.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 
 /// What the lobby form holds: a lobby as the user has typed it, before the
@@ -19,6 +20,7 @@ class LobbyDraft extends Equatable {
     this.description,
     this.address,
     this.chatLink,
+    this.avatar = const AvatarSelection.unchanged(),
   });
 
   /// Normalises raw form input.
@@ -31,6 +33,7 @@ class LobbyDraft extends Equatable {
     String? description,
     String? address,
     String? chatLink,
+    AvatarSelection avatar = const AvatarSelection.unchanged(),
   }) => LobbyDraft(
     name: name.trim(),
     country: country.trim(),
@@ -40,6 +43,7 @@ class LobbyDraft extends Equatable {
     description: _blankToNull(description),
     address: _blankToNull(address),
     chatLink: _blankToNull(chatLink),
+    avatar: avatar,
   );
 
   /// The starting point when editing: the lobby as it stands.
@@ -65,6 +69,11 @@ class LobbyDraft extends Equatable {
   final String? address;
   final String? chatLink;
 
+  /// What happened to the picture while the form was open. Untouched on a
+  /// draft built from a stored lobby, which is what makes an unedited form
+  /// compare equal to it.
+  final AvatarSelection avatar;
+
   static String? _blankToNull(String? value) {
     final trimmed = value?.trim();
 
@@ -81,5 +90,6 @@ class LobbyDraft extends Equatable {
     description,
     address,
     chatLink,
+    avatar,
   ];
 }

@@ -43,7 +43,13 @@ class LobbyRepository {
     }
   }
 
-  Future<Lobby> create(LobbyDraft draft) async {
+  /// `POST /lobbies` — the caller becomes the admin.
+  ///
+  /// [avatarFileId] has to be a file this user uploaded through `POST /files`,
+  /// or the call fails with `404 file_not_found`. There is nothing to clear on
+  /// a lobby that does not exist yet, which is why this one is a plain
+  /// nullable while the same field on [update] is an `Optional`.
+  Future<Lobby> create(LobbyDraft draft, {String? avatarFileId}) async {
     final body = <String, dynamic>{
       'name': draft.name,
       'country': draft.country,
@@ -53,6 +59,7 @@ class LobbyRepository {
       'description': ?draft.description,
       'address': ?draft.address,
       'chat_link': ?draft.chatLink,
+      'avatar_file_id': ?avatarFileId,
     };
 
     try {
@@ -90,6 +97,7 @@ class LobbyRepository {
     Optional<String>? description,
     Optional<String>? address,
     Optional<String>? chatLink,
+    Optional<String>? avatarFileId,
   }) async {
     final body = <String, dynamic>{
       'name': ?name,
@@ -102,6 +110,9 @@ class LobbyRepository {
       if (description != null) 'description': description.value,
       if (address != null) 'address': address.value,
       if (chatLink != null) 'chat_link': chatLink.value,
+      // Clearing this one also releases the file: the server deletes it unless
+      // something else still points at it.
+      if (avatarFileId != null) 'avatar_file_id': avatarFileId.value,
     };
 
     try {

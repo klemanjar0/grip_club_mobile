@@ -1,11 +1,17 @@
 part of 'profile_bloc.dart';
 
 /// What succeeded, so the page can confirm it once.
-enum ProfileOutcome { preferencesSaved, passwordChanged }
+enum ProfileOutcome {
+  preferencesSaved,
+  avatarSaved,
+  avatarRemoved,
+  passwordChanged,
+}
 
 class ProfileState extends Equatable {
   const ProfileState({
     this.isSavingPreferences = false,
+    this.isSavingAvatar = false,
     this.isChangingPassword = false,
     this.updatedUser,
     this.outcome,
@@ -15,6 +21,10 @@ class ProfileState extends Equatable {
   });
 
   final bool isSavingPreferences;
+
+  /// The picture is uploading, or the profile is being patched with its id.
+  final bool isSavingAvatar;
+
   final bool isChangingPassword;
 
   /// The profile as the server now has it. The page hands this to `AuthBloc`.
@@ -31,10 +41,12 @@ class ProfileState extends Equatable {
   /// `new_password`, …).
   final Map<String, String> fieldErrors;
 
-  bool get isBusy => isSavingPreferences || isChangingPassword;
+  bool get isBusy =>
+      isSavingPreferences || isSavingAvatar || isChangingPassword;
 
   ProfileState copyWith({
     bool? isSavingPreferences,
+    bool? isSavingAvatar,
     bool? isChangingPassword,
     User? updatedUser,
     ProfileOutcome? outcome,
@@ -44,6 +56,7 @@ class ProfileState extends Equatable {
     bool clearFeedback = false,
   }) => ProfileState(
     isSavingPreferences: isSavingPreferences ?? this.isSavingPreferences,
+    isSavingAvatar: isSavingAvatar ?? this.isSavingAvatar,
     isChangingPassword: isChangingPassword ?? this.isChangingPassword,
     updatedUser: updatedUser ?? this.updatedUser,
     outcome: clearFeedback ? null : outcome ?? this.outcome,
@@ -55,6 +68,7 @@ class ProfileState extends Equatable {
   @override
   List<Object?> get props => [
     isSavingPreferences,
+    isSavingAvatar,
     isChangingPassword,
     updatedUser,
     outcome,

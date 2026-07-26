@@ -4,10 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:grip_club_mobile/app/router/app_router.dart';
+import 'package:grip_club_mobile/core/images/photo_picker.dart';
+import 'package:grip_club_mobile/core/network/authorized_images.dart';
 import 'package:grip_club_mobile/core/network/dio_client.dart';
 import 'package:grip_club_mobile/core/storage/token_storage.dart';
 import 'package:grip_club_mobile/features/auth/bloc/auth_bloc.dart';
 import 'package:grip_club_mobile/features/auth/data/auth_repository.dart';
+import 'package:grip_club_mobile/features/files/data/avatar_uploader.dart';
+import 'package:grip_club_mobile/features/files/data/file_repository.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/create_lobby_bloc.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/edit_lobby_bloc.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/lobby_detail_bloc.dart';
@@ -39,8 +43,21 @@ Future<void> configureDependencies() async {
         onUnauthorized: () => getIt<AuthBloc>().add(const AuthSessionExpired()),
       ),
     )
+    // Image loading needs the token on the request: `avatar.url` is an
+    // authenticated endpoint, not a public one.
+    ..registerSingleton<AuthorizedImages>(
+      AuthorizedImages(tokenStorage: getIt<TokenStorage>()),
+    )
+    ..registerSingleton<PhotoPicker>(PhotoPicker())
     ..registerSingleton<AuthRepository>(
       AuthRepository(dio: getIt<Dio>(), tokenStorage: getIt<TokenStorage>()),
+    )
+    ..registerSingleton<FileRepository>(FileRepository(dio: getIt<Dio>()))
+    // Shared by profile and lobbies: the `avatar_file_id` field, and the
+    // upload that has to happen before it can be filled in, are the same in
+    // both places.
+    ..registerSingleton<AvatarUploader>(
+      AvatarUploader(files: getIt<FileRepository>()),
     )
     ..registerSingleton<LobbyRepository>(LobbyRepository(dio: getIt<Dio>()))
     ..registerSingleton<MembershipRepository>(
@@ -84,12 +101,16 @@ Future<void> configureDependencies() async {
     // Page-scoped blocs: mounted with `BlocProvider(create:)`, which closes
     // them with the page.
     ..registerFactory<CreateLobbyBloc>(
-      () => CreateLobbyBloc(repository: getIt<LobbyRepository>()),
+      () => CreateLobbyBloc(
+        repository: getIt<LobbyRepository>(),
+        avatars: getIt<AvatarUploader>(),
+      ),
     )
     ..registerFactoryParam<EditLobbyBloc, String, Lobby?>(
       (lobbyId, initialLobby) => EditLobbyBloc(
         lobbyId: lobbyId,
         repository: getIt<LobbyRepository>(),
+        avatars: getIt<AvatarUploader>(),
         initialLobby: initialLobby,
       ),
     )
@@ -114,6 +135,7 @@ Future<void> configureDependencies() async {
       () => ProfileBloc(
         users: getIt<UserRepository>(),
         auth: getIt<AuthRepository>(),
+        avatars: getIt<AvatarUploader>(),
       ),
     );
 }

@@ -1,6 +1,8 @@
 import 'package:mocktail/mocktail.dart';
 
 import 'package:grip_club_mobile/app/di/injector.dart';
+import 'package:grip_club_mobile/core/images/photo_picker.dart';
+import 'package:grip_club_mobile/core/network/authorized_images.dart';
 import 'package:grip_club_mobile/core/pagination/page_envelope.dart';
 import 'package:grip_club_mobile/features/auth/data/auth_repository.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/create_lobby_bloc.dart';
@@ -16,7 +18,10 @@ import 'package:grip_club_mobile/features/notifications/bloc/notifications_bloc.
 import 'package:grip_club_mobile/features/notifications/data/notification_repository.dart';
 import 'package:grip_club_mobile/features/notifications/domain/app_notification.dart';
 import 'package:grip_club_mobile/features/profile/bloc/profile_bloc.dart';
+import 'package:grip_club_mobile/features/files/data/avatar_uploader.dart';
 import 'package:grip_club_mobile/features/profile/data/user_repository.dart';
+
+import 'avatar_fixtures.dart';
 
 class MockLobbyRepository extends Mock implements LobbyRepository {}
 
@@ -75,7 +80,15 @@ DashboardMocks registerDashboardStubs({AuthRepository? auth}) {
   ).thenAnswer((_) async => _emptyPage<AppNotification>());
   when(notifications.unreadCount).thenAnswer((_) async => 0);
 
+  // Nothing here has a session or a platform channel, so the two image
+  // services are stubs: one hands back bytes that decode, the other is only
+  // reached if a test taps the picker.
+  final avatars = avatarUploader();
+
   getIt
+    ..registerSingleton<AuthorizedImages>(stubbedImages())
+    ..registerSingleton<PhotoPicker>(MockPhotoPicker())
+    ..registerSingleton<AvatarUploader>(avatars)
     ..registerSingleton<LobbyRepository>(lobbies)
     ..registerSingleton<MembershipRepository>(memberships)
     ..registerSingleton<NotificationRepository>(notifications)
@@ -96,12 +109,13 @@ DashboardMocks registerDashboardStubs({AuthRepository? auth}) {
       ),
     )
     ..registerFactory<CreateLobbyBloc>(
-      () => CreateLobbyBloc(repository: lobbies),
+      () => CreateLobbyBloc(repository: lobbies, avatars: avatars),
     )
     ..registerFactoryParam<EditLobbyBloc, String, Lobby?>(
       (lobbyId, initialLobby) => EditLobbyBloc(
         lobbyId: lobbyId,
         repository: lobbies,
+        avatars: avatars,
         initialLobby: initialLobby,
       ),
     )
@@ -125,7 +139,7 @@ DashboardMocks registerDashboardStubs({AuthRepository? auth}) {
     getIt
       ..registerSingleton<AuthRepository>(auth)
       ..registerFactory<ProfileBloc>(
-        () => ProfileBloc(users: users, auth: auth),
+        () => ProfileBloc(users: users, auth: auth, avatars: avatars),
       );
   }
 

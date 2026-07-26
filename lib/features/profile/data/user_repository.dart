@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import 'package:grip_club_mobile/core/network/api_exception.dart';
+import 'package:grip_club_mobile/core/patch/optional.dart';
 import 'package:grip_club_mobile/features/auth/domain/user.dart';
 
 /// Reads and updates the signed-in user's profile.
@@ -15,15 +16,21 @@ class UserRepository {
   /// `PATCH /me` — every field is optional and independent.
   ///
   /// Omitted keys are left unchanged server-side, so only non-null arguments go
-  /// into the body. None of these fields are nullable, which is why there is no
-  /// way to "clear" one: sending `''` for [displayName] or [city] resets it to
-  /// the empty default instead.
+  /// into the body. None of the text fields are nullable, which is why there is
+  /// no way to "clear" one: sending `''` for [displayName] or [city] resets it
+  /// to the empty default instead.
+  ///
+  /// [avatarFileId] is the exception, and the reason it is an [Optional]: an
+  /// explicit `null` there *removes* the picture, while leaving the argument
+  /// out keeps whatever is on the profile. The id has to come from this user's
+  /// own `POST /files`, or the call fails with `404 file_not_found`.
   Future<User> updatePreferences({
     String? displayName,
     String? locale,
     String? timezone,
     String? city,
     String? timeFilter,
+    Optional<String>? avatarFileId,
   }) async {
     final body = <String, dynamic>{
       'display_name': ?displayName,
@@ -31,6 +38,9 @@ class UserRepository {
       'timezone': ?timezone,
       'city': ?city,
       'time_filter': ?timeFilter,
+      // Present-and-null is the whole point here: the key has to be in the body
+      // carrying `null`, which `?` would drop.
+      if (avatarFileId != null) 'avatar_file_id': avatarFileId.value,
     };
 
     try {

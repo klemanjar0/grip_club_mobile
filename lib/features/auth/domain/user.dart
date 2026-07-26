@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import 'package:grip_club_mobile/core/images/remote_image.dart';
+
 /// The signed-in user, as returned by `GET /me`.
 ///
 /// Mirrors the API's `UserResponse`. [locale] and [timeFilter] stay as strings
@@ -15,6 +17,7 @@ class User extends Equatable {
     this.timezone = 'UTC',
     this.city = '',
     this.timeFilter = 'all',
+    this.avatar,
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
@@ -30,6 +33,7 @@ class User extends Equatable {
     timezone: json['timezone'] as String? ?? 'UTC',
     city: json['city'] as String? ?? '',
     timeFilter: json['time_filter'] as String? ?? 'all',
+    avatar: RemoteImage.fromJson(json['avatar']),
     createdAt: DateTime.tryParse(json['created_at'] as String? ?? ''),
   );
 
@@ -49,6 +53,9 @@ class User extends Equatable {
   /// Saved browsing default: `day` | `week` | `month` | `all`.
   final String timeFilter;
 
+  /// The uploaded profile picture. `null` until one is set.
+  final RemoteImage? avatar;
+
   final DateTime? createdAt;
 
   @override
@@ -60,6 +67,7 @@ class User extends Equatable {
     timezone,
     city,
     timeFilter,
+    avatar,
     createdAt,
   ];
 }

@@ -92,6 +92,7 @@ class _EditLobbyView extends StatelessWidget {
           return SafeArea(
             child: LobbyForm(
               initial: LobbyDraft.of(lobby),
+              currentAvatar: lobby.avatar,
               submitLabel: 'Save changes',
               isSubmitting: state.isSubmitting,
               fieldErrors: state.fieldErrors,

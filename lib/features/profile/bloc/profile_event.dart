@@ -28,6 +28,20 @@ final class ProfilePreferencesSubmitted extends ProfileEvent {
   List<Object?> get props => [displayName, locale, timezone, city, timeFilter];
 }
 
+/// A new picture, or the removal of the current one.
+///
+/// Its own event rather than a field on [ProfilePreferencesSubmitted]: the
+/// picture is edited by tapping it and saves immediately, so it never waits for
+/// the Save button under the text fields.
+final class ProfileAvatarSubmitted extends ProfileEvent {
+  const ProfileAvatarSubmitted(this.selection);
+
+  final AvatarSelection selection;
+
+  @override
+  List<Object?> get props => [selection];
+}
+
 final class ProfilePasswordSubmitted extends ProfileEvent {
   const ProfilePasswordSubmitted({
     required this.currentPassword,

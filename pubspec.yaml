@@ -41,6 +41,11 @@ dependencies:
   get_it: ^9.2.1
   equatable: ^2.1.0
   bloc: ^9.2.1
+  # Avatar picking. Two packages because the OS offers two different places to
+  # take an image from: `image_picker` is the photo library (and the camera),
+  # `file_picker` is the document browser. See `core/images/photo_picker.dart`.
+  image_picker: ^1.2.3
+  file_picker: ^11.0.2
 
 dev_dependencies:
   flutter_test:

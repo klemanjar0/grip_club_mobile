@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 
 import 'package:grip_club_mobile/core/network/api_exception.dart';
 import 'package:grip_club_mobile/core/patch/optional.dart';
+import 'package:grip_club_mobile/features/files/data/avatar_uploader.dart';
 import 'package:grip_club_mobile/features/lobbies/data/lobby_repository.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby_draft.dart';
@@ -23,6 +24,7 @@ class EditLobbyBloc extends Bloc<EditLobbyEvent, EditLobbyState> {
   EditLobbyBloc({
     required this.lobbyId,
     required this._repository,
+    required this._avatars,
     Lobby? initialLobby,
   }) : super(
          initialLobby == null
@@ -35,6 +37,7 @@ class EditLobbyBloc extends Bloc<EditLobbyEvent, EditLobbyState> {
 
   final String lobbyId;
   final LobbyRepository _repository;
+  final AvatarUploader _avatars;
 
   Future<void> _onStarted(
     EditLobbyStarted event,
@@ -95,6 +98,9 @@ class EditLobbyBloc extends Bloc<EditLobbyEvent, EditLobbyState> {
         description: _clearable(draft.description, current.description),
         address: _clearable(draft.address, current.address),
         chatLink: _clearable(draft.chatLink, current.chatLink),
+        // Already an Optional with the right shape: untouched leaves the key
+        // out, removed sends an explicit null, a new pick uploads first.
+        avatarFileId: await _avatars.resolve(draft.avatar),
       );
 
       emit(

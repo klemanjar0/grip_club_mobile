@@ -2,6 +2,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:grip_club_mobile/core/images/avatar_selection.dart';
 import 'package:grip_club_mobile/core/network/api_exception.dart';
 import 'package:grip_club_mobile/core/patch/optional.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/edit_lobby_bloc.dart';
@@ -9,6 +10,7 @@ import 'package:grip_club_mobile/features/lobbies/data/lobby_repository.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby_draft.dart';
 
+import '../../helpers/avatar_fixtures.dart';
 import '../../helpers/lobby_fixtures.dart';
 
 class _MockLobbyRepository extends Mock implements LobbyRepository {}
@@ -32,11 +34,16 @@ final _unchanged = LobbyDraft.of(_stored);
 
 void main() {
   late LobbyRepository repository;
+  late MockFileRepository files;
 
-  setUpAll(() => registerFallbackValue(_unchanged));
+  setUpAll(() {
+    registerFallbackValue(_unchanged);
+    registerFallbackValue(testImage());
+  });
 
   setUp(() {
     repository = _MockLobbyRepository();
+    files = MockFileRepository();
     when(
       () => repository.update(
         any(),
@@ -48,6 +55,7 @@ void main() {
         description: any(named: 'description'),
         address: any(named: 'address'),
         chatLink: any(named: 'chatLink'),
+        avatarFileId: any(named: 'avatarFileId'),
       ),
     ).thenAnswer((_) async => _stored);
   });
@@ -55,6 +63,7 @@ void main() {
   EditLobbyBloc build({Lobby? initialLobby = _dontCare}) => EditLobbyBloc(
     lobbyId: _lobbyId,
     repository: repository,
+    avatars: avatarUploader(files),
     initialLobby: identical(initialLobby, _dontCare) ? _stored : initialLobby,
   );
 
@@ -125,6 +134,7 @@ void main() {
           description: null,
           address: null,
           chatLink: null,
+          avatarFileId: null,
         ),
       ).called(1),
     );
@@ -158,6 +168,7 @@ void main() {
           description: null,
           address: const Optional<String>.clear(),
           chatLink: null,
+          avatarFileId: null,
         ),
       ).called(1),
     );
@@ -179,6 +190,7 @@ void main() {
           description: any(named: 'description'),
           address: any(named: 'address'),
           chatLink: any(named: 'chatLink'),
+          avatarFileId: any(named: 'avatarFileId'),
         ),
       ),
       expect: () => [EditLobbyState(lobby: _stored, savedLobby: _stored)],
@@ -201,6 +213,7 @@ void main() {
             description: any(named: 'description'),
             address: any(named: 'address'),
             chatLink: any(named: 'chatLink'),
+            avatarFileId: any(named: 'avatarFileId'),
           ),
         ).thenAnswer((_) async => renamed);
       },
@@ -241,6 +254,7 @@ void main() {
               description: any(named: 'description'),
               address: any(named: 'address'),
               chatLink: any(named: 'chatLink'),
+              avatarFileId: any(named: 'avatarFileId'),
             ),
           ).thenThrow(
             const ApiException(
@@ -278,6 +292,92 @@ void main() {
           },
         ),
       ],
+    );
+  });
+
+  group('the picture', () {
+    /// The form as it opens, with a new image chosen and nothing else touched.
+    LobbyDraft withNewPhoto() => LobbyDraft.fromInput(
+      name: _stored.name,
+      country: _stored.country,
+      city: _stored.city,
+      eventTime: _stored.eventTime!,
+      visibility: _stored.visibility,
+      description: _stored.description,
+      address: _stored.address,
+      chatLink: _stored.chatLink,
+      avatar: AvatarSelection.picked(testImage()),
+    );
+
+    blocTest<EditLobbyBloc, EditLobbyState>(
+      'is uploaded first, then attached by id',
+      setUp: () => when(
+        () => files.upload(any()),
+      ).thenAnswer((_) async => remoteImage(id: 'uploaded-id')),
+      build: build,
+      act: (bloc) => bloc.add(EditLobbySubmitted(withNewPhoto())),
+      verify: (_) => verify(
+        () => repository.update(
+          _lobbyId,
+          name: null,
+          country: null,
+          city: null,
+          eventTime: null,
+          visibility: null,
+          description: null,
+          address: null,
+          chatLink: null,
+          avatarFileId: const Optional<String>('uploaded-id'),
+        ),
+      ).called(1),
+    );
+
+    blocTest<EditLobbyBloc, EditLobbyState>(
+      'counts as a change on its own, so a photo-only edit still saves',
+      setUp: () => when(
+        () => files.upload(any()),
+      ).thenAnswer((_) async => remoteImage(id: 'uploaded-id')),
+      build: build,
+      act: (bloc) => bloc.add(EditLobbySubmitted(withNewPhoto())),
+      skip: 1,
+      verify: (bloc) => expect(bloc.state.hasChanges, isTrue),
+    );
+
+    blocTest<EditLobbyBloc, EditLobbyState>(
+      'removing sends an explicit null and uploads nothing',
+      build: build,
+      act: (bloc) => bloc.add(
+        EditLobbySubmitted(
+          LobbyDraft.fromInput(
+            name: _stored.name,
+            country: _stored.country,
+            city: _stored.city,
+            eventTime: _stored.eventTime!,
+            visibility: _stored.visibility,
+            description: _stored.description,
+            address: _stored.address,
+            chatLink: _stored.chatLink,
+            avatar: const AvatarSelection.cleared(),
+          ),
+        ),
+      ),
+      verify: (_) {
+        verifyNever(() => files.upload(any()));
+        verify(
+          () => repository.update(
+            _lobbyId,
+            name: null,
+            country: null,
+            city: null,
+            eventTime: null,
+            visibility: null,
+            description: null,
+            address: null,
+            chatLink: null,
+            avatarFileId: const Optional<String>.clear(),
+          ),
+        ).called(1);
+      },
     );
   });
 }

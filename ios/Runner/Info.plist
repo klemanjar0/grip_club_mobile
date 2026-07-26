@@ -33,6 +33,11 @@
 			<key>NSAllowsLocalNetworking</key>
 			<true/>
 		</dict>
+		<!-- Shown when picking a profile or lobby photo. The picker runs out of
+         process, so iOS never actually grants library access — but the key has
+         to be here or the app is rejected at review. -->
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Choose a photo for your profile or for a lobby you organize.</string>
 		<key>UIApplicationSceneManifest</key>
 		<dict>
 			<key>UIApplicationSupportsMultipleScenes</key>

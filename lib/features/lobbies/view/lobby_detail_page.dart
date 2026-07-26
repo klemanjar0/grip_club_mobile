@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:grip_club_mobile/app/di/injector.dart';
 import 'package:grip_club_mobile/app/router/routes.dart';
 import 'package:grip_club_mobile/core/format/event_time_format.dart';
+import 'package:grip_club_mobile/core/ui/avatar_image.dart';
+import 'package:grip_club_mobile/core/ui/avatar_viewer.dart';
 import 'package:grip_club_mobile/core/ui/status_views.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/lobby_detail_bloc.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
@@ -269,6 +271,21 @@ class _LobbyBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
+        // Only when there is one: an empty placeholder banner would be a large
+        // piece of nothing at the top of every lobby without a photo.
+        if (lobby.avatar case final avatar?) ...[
+          GestureDetector(
+            // The banner is cropped to 16:9, so a tap is the only way to see
+            // the whole picture.
+            onTap: () =>
+                showAvatarViewer(context, image: avatar, title: lobby.name),
+            child: AvatarImage.banner(
+              image: avatar,
+              icon: Icons.image_outlined,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         Row(
           children: [
             Icon(

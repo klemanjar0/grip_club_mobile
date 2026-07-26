@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:grip_club_mobile/app/config/app_config.dart';
 import 'package:grip_club_mobile/app/di/injector.dart';
+import 'package:grip_club_mobile/core/images/avatar_selection.dart';
+import 'package:grip_club_mobile/core/ui/avatar_field.dart';
 import 'package:grip_club_mobile/features/auth/bloc/auth_bloc.dart';
 import 'package:grip_club_mobile/features/auth/domain/user.dart';
 import 'package:grip_club_mobile/features/profile/bloc/profile_bloc.dart';
@@ -25,6 +27,12 @@ class ProfilePage extends StatelessWidget {
 class _ProfileView extends StatelessWidget {
   const _ProfileView();
 
+  void _tell(BuildContext context, String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.select((AuthBloc bloc) => bloc.state.user);
@@ -34,26 +42,35 @@ class _ProfileView extends StatelessWidget {
       body: SafeArea(
         child: BlocListener<ProfileBloc, ProfileState>(
           listenWhen: (previous, current) =>
-              previous.outcome != current.outcome && current.outcome != null,
+              (previous.outcome != current.outcome &&
+                  current.outcome != null) ||
+              (previous.errorMessage != current.errorMessage &&
+                  current.errorMessage != null),
           listener: (context, state) {
+            final outcome = state.outcome;
+            if (outcome == null) {
+              // A `validation_failed` is already on the fields it names; a
+              // failed upload or attach has no field to land on.
+              if (state.fieldErrors.isEmpty) {
+                _tell(context, state.errorMessage!);
+              }
+              return;
+            }
+
             // The saved profile is the app's copy of the user: hand it to the
-            // AuthBloc so the lobby filters pick up the new defaults.
+            // AuthBloc so the lobby filters and the picture pick up the change.
             final updated = state.updatedUser;
             if (updated != null) {
               context.read<AuthBloc>().add(AuthUserUpdated(updated));
             }
 
-            ScaffoldMessenger.of(context)
-              ..hideCurrentSnackBar()
-              ..showSnackBar(
-                SnackBar(
-                  content: Text(switch (state.outcome!) {
-                    ProfileOutcome.preferencesSaved => 'Preferences saved.',
-                    ProfileOutcome.passwordChanged =>
-                      'Password changed. Other devices were signed out.',
-                  }),
-                ),
-              );
+            _tell(context, switch (outcome) {
+              ProfileOutcome.preferencesSaved => 'Preferences saved.',
+              ProfileOutcome.avatarSaved => 'Photo updated.',
+              ProfileOutcome.avatarRemoved => 'Photo removed.',
+              ProfileOutcome.passwordChanged =>
+                'Password changed. Other devices were signed out.',
+            });
           },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -79,6 +96,11 @@ class _ProfileView extends StatelessWidget {
   }
 }
 
+/// Who you are, and the one control that changes your picture.
+///
+/// The picture saves the moment it is picked rather than waiting for the Save
+/// button below — it is not part of the preferences form, and pairing an image
+/// with a text form would mean an upload the user cannot see the result of.
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({required this.user});
 
@@ -86,13 +108,28 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isSaving = context.select(
+      (ProfileBloc bloc) => bloc.state.isSavingAvatar,
+    );
+
     return Card(
       margin: EdgeInsets.zero,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: const CircleAvatar(child: Icon(Icons.person)),
-        title: Text(user.displayName),
-        subtitle: Text(user.email),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: AvatarField(
+          // Nothing is held between taps: each pick is saved on the spot, and
+          // what comes back on the [User] is what the field renders next.
+          selection: const AvatarSelection.unchanged(),
+          current: user.avatar,
+          isBusy: isSaving,
+          size: 72,
+          emptyLabel: 'Add a photo',
+          onChanged: (selection) => context.read<ProfileBloc>().add(
+            ProfileAvatarSubmitted(selection),
+          ),
+          label: user.displayName,
+          helperText: user.email,
+        ),
       ),
     );
   }

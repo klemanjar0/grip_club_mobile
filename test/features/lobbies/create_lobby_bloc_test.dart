@@ -8,6 +8,7 @@ import 'package:grip_club_mobile/features/lobbies/data/lobby_repository.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby_draft.dart';
 
+import '../../helpers/avatar_fixtures.dart';
 import '../../helpers/lobby_fixtures.dart';
 
 class _MockLobbyRepository extends Mock implements LobbyRepository {}
@@ -33,7 +34,9 @@ void main() {
   setUp(() => repository = _MockLobbyRepository());
 
   void stubCreate({Object? throws, Lobby? returns}) {
-    final call = when(() => repository.create(any()));
+    final call = when(
+      () => repository.create(any(), avatarFileId: any(named: 'avatarFileId')),
+    );
 
     if (throws != null) {
       call.thenThrow(throws);
@@ -45,13 +48,16 @@ void main() {
   blocTest<CreateLobbyBloc, CreateLobbyState>(
     'emits submitting then the created lobby',
     setUp: () => stubCreate(returns: _created),
-    build: () => CreateLobbyBloc(repository: repository),
+    build: () =>
+        CreateLobbyBloc(repository: repository, avatars: avatarUploader()),
     act: (bloc) => bloc.add(_submitted),
     expect: () => [
       const CreateLobbyState.submitting(),
       CreateLobbyState.success(_created),
     ],
-    verify: (_) => verify(() => repository.create(_draft)).called(1),
+    // No picture on the draft, so nothing is uploaded and the key stays out.
+    verify: (_) =>
+        verify(() => repository.create(_draft, avatarFileId: null)).called(1),
   );
 
   blocTest<CreateLobbyBloc, CreateLobbyState>(
@@ -64,7 +70,8 @@ void main() {
         fieldErrors: <String, String>{'event_time': 'must be in the future'},
       ),
     ),
-    build: () => CreateLobbyBloc(repository: repository),
+    build: () =>
+        CreateLobbyBloc(repository: repository, avatars: avatarUploader()),
     act: (bloc) => bloc.add(_submitted),
     expect: () => const [
       CreateLobbyState.submitting(),
@@ -79,7 +86,8 @@ void main() {
     'reports a transport failure with no field errors',
     setUp: () =>
         stubCreate(throws: const ApiException('No internet connection.')),
-    build: () => CreateLobbyBloc(repository: repository),
+    build: () =>
+        CreateLobbyBloc(repository: repository, avatars: avatarUploader()),
     act: (bloc) => bloc.add(_submitted),
     expect: () => const [
       CreateLobbyState.submitting(),

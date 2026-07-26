@@ -2,11 +2,15 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:grip_club_mobile/core/images/avatar_selection.dart';
 import 'package:grip_club_mobile/core/network/api_exception.dart';
+import 'package:grip_club_mobile/core/patch/optional.dart';
 import 'package:grip_club_mobile/features/auth/data/auth_repository.dart';
 import 'package:grip_club_mobile/features/auth/domain/user.dart';
 import 'package:grip_club_mobile/features/profile/bloc/profile_bloc.dart';
 import 'package:grip_club_mobile/features/profile/data/user_repository.dart';
+
+import '../../helpers/avatar_fixtures.dart';
 
 class _MockUserRepository extends Mock implements UserRepository {}
 
@@ -24,13 +28,18 @@ final _saved = User(
 void main() {
   late UserRepository users;
   late AuthRepository auth;
+  late MockFileRepository files;
+
+  setUpAll(() => registerFallbackValue(testImage()));
 
   setUp(() {
     users = _MockUserRepository();
     auth = _MockAuthRepository();
+    files = MockFileRepository();
   });
 
-  ProfileBloc build() => ProfileBloc(users: users, auth: auth);
+  ProfileBloc build() =>
+      ProfileBloc(users: users, auth: auth, avatars: avatarUploader(files));
 
   group('ProfilePreferencesSubmitted', () {
     blocTest<ProfileBloc, ProfileState>(
@@ -151,6 +160,105 @@ void main() {
         ProfileState(
           errorMessage: 'Your current password is wrong.',
           errorCode: 'invalid_credentials',
+        ),
+      ],
+    );
+  });
+
+  group('ProfileAvatarSubmitted', () {
+    /// The picture patch touches nothing else, so every other key is absent.
+    void stubAttach({User? returns, Object? throws}) {
+      final call = when(
+        () => users.updatePreferences(avatarFileId: any(named: 'avatarFileId')),
+      );
+
+      if (throws != null) {
+        call.thenThrow(throws);
+      } else {
+        call.thenAnswer((_) async => returns!);
+      }
+    }
+
+    blocTest<ProfileBloc, ProfileState>(
+      'uploads the image, then attaches the id it came back with',
+      setUp: () {
+        when(
+          () => files.upload(any()),
+        ).thenAnswer((_) async => remoteImage(id: 'uploaded-id'));
+        stubAttach(returns: _saved);
+      },
+      build: build,
+      act: (bloc) =>
+          bloc.add(ProfileAvatarSubmitted(AvatarSelection.picked(testImage()))),
+      expect: () => [
+        const ProfileState(isSavingAvatar: true),
+        ProfileState(updatedUser: _saved, outcome: ProfileOutcome.avatarSaved),
+      ],
+      verify: (_) => verify(
+        () => users.updatePreferences(
+          avatarFileId: const Optional<String>('uploaded-id'),
+        ),
+      ).called(1),
+    );
+
+    blocTest<ProfileBloc, ProfileState>(
+      'removing sends an explicit null and never uploads',
+      setUp: () => stubAttach(returns: _saved),
+      build: build,
+      act: (bloc) =>
+          bloc.add(const ProfileAvatarSubmitted(AvatarSelection.cleared())),
+      expect: () => [
+        const ProfileState(isSavingAvatar: true),
+        ProfileState(
+          updatedUser: _saved,
+          outcome: ProfileOutcome.avatarRemoved,
+        ),
+      ],
+      verify: (_) {
+        verifyNever(() => files.upload(any()));
+        verify(
+          () => users.updatePreferences(
+            avatarFileId: const Optional<String>.clear(),
+          ),
+        ).called(1);
+      },
+    );
+
+    blocTest<ProfileBloc, ProfileState>(
+      'does nothing at all when the picker was dismissed',
+      build: build,
+      act: (bloc) =>
+          bloc.add(const ProfileAvatarSubmitted(AvatarSelection.unchanged())),
+      expect: () => <ProfileState>[],
+      verify: (_) => verifyNever(
+        () => users.updatePreferences(avatarFileId: any(named: 'avatarFileId')),
+      ),
+    );
+
+    blocTest<ProfileBloc, ProfileState>(
+      'reports an expired upload instead of leaving the field spinning',
+      setUp: () {
+        when(
+          () => files.upload(any()),
+        ).thenAnswer((_) async => remoteImage(id: 'uploaded-id'));
+        // The file was reclaimed between the upload and the attach, or it
+        // belongs to someone else.
+        stubAttach(
+          throws: const ApiException(
+            'No such file.',
+            statusCode: 404,
+            code: 'file_not_found',
+          ),
+        );
+      },
+      build: build,
+      act: (bloc) =>
+          bloc.add(ProfileAvatarSubmitted(AvatarSelection.picked(testImage()))),
+      expect: () => const [
+        ProfileState(isSavingAvatar: true),
+        ProfileState(
+          errorMessage: 'No such file.',
+          errorCode: 'file_not_found',
         ),
       ],
     );

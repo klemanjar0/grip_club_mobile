@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'package:grip_club_mobile/core/format/event_time_format.dart';
+import 'package:grip_club_mobile/core/images/avatar_selection.dart';
+import 'package:grip_club_mobile/core/images/remote_image.dart';
+import 'package:grip_club_mobile/core/ui/avatar_field.dart';
+import 'package:grip_club_mobile/core/ui/avatar_image.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby_draft.dart';
 import 'package:grip_club_mobile/features/lobbies/view/lobby_validators.dart';
@@ -17,6 +21,7 @@ class LobbyForm extends StatefulWidget {
     required this.isSubmitting,
     required this.onSubmit,
     this.initial,
+    this.currentAvatar,
     this.fieldErrors = const {},
     super.key,
   });
@@ -27,6 +32,10 @@ class LobbyForm extends StatefulWidget {
 
   /// Starting values. Absent when creating.
   final LobbyDraft? initial;
+
+  /// The picture the lobby already has, so the field can show it. Lives outside
+  /// [LobbyDraft], which holds what the user typed rather than what is stored.
+  final RemoteImage? currentAvatar;
 
   /// From `validation_failed`, keyed by JSON field name.
   final Map<String, String> fieldErrors;
@@ -46,6 +55,10 @@ class LobbyFormState extends State<LobbyForm> {
 
   DateTime? _eventTime;
   late LobbyVisibility _visibility;
+
+  /// Held rather than uploaded: nothing leaves the device until the form is
+  /// submitted, so backing out costs nothing.
+  AvatarSelection _avatar = const AvatarSelection.unchanged();
 
   /// Set from a server-side `validation_failed`; cleared as soon as the field
   /// is edited again.
@@ -153,6 +166,7 @@ class LobbyFormState extends State<LobbyForm> {
         description: _descriptionController.text,
         address: _addressController.text,
         chatLink: _chatLinkController.text,
+        avatar: _avatar,
       ),
     );
   }
@@ -171,6 +185,19 @@ class LobbyFormState extends State<LobbyForm> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                AvatarField(
+                  selection: _avatar,
+                  current: widget.currentAvatar,
+                  enabled: !widget.isSubmitting,
+                  shape: AvatarShape.rounded,
+                  icon: Icons.image_outlined,
+                  size: 96,
+                  label: 'Photo',
+                  helperText: 'Everyone browsing sees this',
+                  errorText: fieldErrors['avatar_file_id'],
+                  onChanged: (selection) => setState(() => _avatar = selection),
+                ),
+                const SizedBox(height: 24),
                 TextFormField(
                   controller: _nameController,
                   textCapitalization: TextCapitalization.sentences,
