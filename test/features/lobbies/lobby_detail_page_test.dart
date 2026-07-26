@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:grip_club_mobile/app/di/injector.dart';
@@ -92,7 +93,9 @@ void main() {
     expect(find.text('Join lobby'), findsNothing);
   });
 
-  testWidgets('the admin is offered the edit action', (tester) async {
+  testWidgets('the admin is offered the edit and delete actions', (
+    tester,
+  ) async {
     when(() => mocks.lobbies.byId(_lobbyId)).thenAnswer(
       (_) async => Lobby.fromJson(
         lobbyJson(role: 'admin', membershipStatus: 'approved', canJoin: false),
@@ -102,6 +105,7 @@ void main() {
     await pumpDetail(tester);
 
     expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.delete_outline), findsOneWidget);
   });
 
   testWidgets('a member is not', (tester) async {
@@ -114,6 +118,7 @@ void main() {
     await pumpDetail(tester);
 
     expect(find.byIcon(Icons.edit_outlined), findsNothing);
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
   });
 
   testWidgets('an admin gets no membership action', (tester) async {
@@ -125,9 +130,110 @@ void main() {
 
     await pumpDetail(tester);
 
-    // Admins cannot leave their own lobby; deleting it is the follow-up pass.
+    // Admins cannot leave their own lobby; their actions are in the app bar.
     expect(find.text('Leave lobby'), findsNothing);
     expect(find.text('Join lobby'), findsNothing);
+  });
+
+  group('deleting', () {
+    final asAdmin = Lobby.fromJson(
+      lobbyJson(role: 'admin', membershipStatus: 'approved', canJoin: false),
+    );
+
+    /// Pushes the page through a real router: deleting pops, and the
+    /// confirmation has to land somewhere.
+    Future<void> pumpRouted(WidgetTester tester) async {
+      final router = GoRouter(
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/',
+            builder: (context, state) => Scaffold(
+              body: TextButton(
+                onPressed: () => context.push('/lobby'),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/lobby',
+            builder: (context, state) =>
+                const LobbyDetailPage(lobbyId: _lobbyId),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> tapDelete(WidgetTester tester) async {
+      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('confirming deletes the lobby and leaves the page', (
+      tester,
+    ) async {
+      when(() => mocks.lobbies.byId(_lobbyId)).thenAnswer((_) async => asAdmin);
+      when(() => mocks.lobbies.deleteLobby(_lobbyId)).thenAnswer((_) async {});
+
+      await pumpRouted(tester);
+      await tapDelete(tester);
+
+      // Other people are in this lobby (`approved_count` is 3), so the warning
+      // says what they lose.
+      expect(
+        find.textContaining('Everyone who joined is notified'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      verify(() => mocks.lobbies.deleteLobby(_lobbyId)).called(1);
+      expect(find.text('Lobby deleted.'), findsOneWidget);
+      // Back on the route underneath — there is no lobby left to show.
+      expect(find.text('open'), findsOneWidget);
+      expect(find.byIcon(Icons.delete_outline), findsNothing);
+    });
+
+    testWidgets('backing out of the dialog deletes nothing', (tester) async {
+      when(() => mocks.lobbies.byId(_lobbyId)).thenAnswer((_) async => asAdmin);
+
+      await pumpRouted(tester);
+      await tapDelete(tester);
+
+      await tester.tap(find.text('Keep lobby'));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => mocks.lobbies.deleteLobby(any()));
+      expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+    });
+
+    testWidgets('a rejected delete keeps the lobby and says why', (
+      tester,
+    ) async {
+      when(() => mocks.lobbies.byId(_lobbyId)).thenAnswer((_) async => asAdmin);
+      when(() => mocks.lobbies.deleteLobby(_lobbyId)).thenThrow(
+        const ApiException(
+          'Only the organizer can do that.',
+          statusCode: 403,
+          code: 'admin_only',
+        ),
+      );
+
+      await pumpRouted(tester);
+      await tapDelete(tester);
+
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Only the organizer can do that.'), findsOneWidget);
+      // Still on the lobby, and the action is available again.
+      expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+    });
   });
 
   group('when the lobby is closed to the caller', () {

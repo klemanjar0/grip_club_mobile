@@ -9,7 +9,7 @@ import 'package:grip_club_mobile/features/members/data/membership_repository.dar
 part 'lobby_detail_event.dart';
 part 'lobby_detail_state.dart';
 
-/// One lobby, plus the join / leave actions on it.
+/// One lobby, plus the join / leave actions on it and the admin's delete.
 ///
 /// After a successful join or leave the lobby is re-fetched rather than patched
 /// locally: `viewer.role`, `approved_count`, `address` and `chat_link` all
@@ -40,6 +40,7 @@ class LobbyDetailBloc extends Bloc<LobbyDetailEvent, LobbyDetailState> {
     );
     on<LobbyDetailJoinRequested>(_onJoinRequested);
     on<LobbyDetailLeaveRequested>(_onLeaveRequested);
+    on<LobbyDetailDeleteRequested>(_onDeleteRequested);
   }
 
   final String lobbyId;
@@ -146,6 +147,30 @@ class LobbyDetailBloc extends Bloc<LobbyDetailEvent, LobbyDetailState> {
         outcome: wasPending
             ? LobbyDetailOutcome.requestWithdrawn
             : LobbyDetailOutcome.left,
+      );
+    } on ApiException catch (exception) {
+      emit(_actionFailed(exception));
+    }
+  }
+
+  /// Deletes the lobby the caller admins.
+  ///
+  /// Nothing is re-read afterwards — the lobby is gone, so the next `GET` would
+  /// be a `404`. The lobby already in [state] stays put so the page has
+  /// something to render while the view pops on the outcome.
+  Future<void> _onDeleteRequested(
+    LobbyDetailDeleteRequested event,
+    Emitter<LobbyDetailState> emit,
+  ) async {
+    if (state.isActing) return;
+
+    emit(state.copyWith(isActing: true, clearError: true, clearOutcome: true));
+
+    try {
+      await _lobbies.deleteLobby(lobbyId);
+
+      emit(
+        state.copyWith(isActing: false, outcome: LobbyDetailOutcome.deleted),
       );
     } on ApiException catch (exception) {
       emit(_actionFailed(exception));

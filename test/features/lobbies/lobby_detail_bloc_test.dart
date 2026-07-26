@@ -20,6 +20,7 @@ const _lobbyId = 'a1b2c3d4-0000-4000-8000-000000000001';
 final _asOutsider = lobby();
 final _asMember = lobby(role: 'member', canJoin: false);
 final _asPending = lobby(role: 'pending', canJoin: false);
+final _asAdmin = lobby(role: 'admin', canJoin: false);
 
 Membership _membership(MembershipStatus status) => Membership(
   lobbyId: _lobbyId,
@@ -292,6 +293,71 @@ void main() {
           errorMessage: 'Delete the lobby instead.',
         ),
       ],
+    );
+  });
+
+  group('LobbyDetailDeleteRequested', () {
+    blocTest<LobbyDetailBloc, LobbyDetailState>(
+      'reports the deletion without re-reading the lobby',
+      setUp: () =>
+          when(() => lobbies.deleteLobby(_lobbyId)).thenAnswer((_) async {}),
+      build: build,
+      seed: () =>
+          LobbyDetailState(status: LobbyDetailStatus.ready, lobby: _asAdmin),
+      act: (bloc) => bloc.add(const LobbyDetailDeleteRequested()),
+      expect: () => [
+        LobbyDetailState(
+          status: LobbyDetailStatus.ready,
+          lobby: _asAdmin,
+          isActing: true,
+        ),
+        LobbyDetailState(
+          status: LobbyDetailStatus.ready,
+          lobby: _asAdmin,
+          outcome: LobbyDetailOutcome.deleted,
+        ),
+      ],
+      // The lobby is gone — a refetch would only be a 404.
+      verify: (_) => verifyNever(() => lobbies.byId(any())),
+    );
+
+    blocTest<LobbyDetailBloc, LobbyDetailState>(
+      'surfaces admin_only and keeps the lobby on screen',
+      setUp: () => when(() => lobbies.deleteLobby(_lobbyId)).thenThrow(
+        const ApiException(
+          'Only the organizer can do that.',
+          statusCode: 403,
+          code: 'admin_only',
+        ),
+      ),
+      build: build,
+      seed: () =>
+          LobbyDetailState(status: LobbyDetailStatus.ready, lobby: _asMember),
+      act: (bloc) => bloc.add(const LobbyDetailDeleteRequested()),
+      skip: 1,
+      expect: () => [
+        LobbyDetailState(
+          status: LobbyDetailStatus.ready,
+          lobby: _asMember,
+          errorMessage: 'Only the organizer can do that.',
+          errorCode: 'admin_only',
+        ),
+      ],
+    );
+
+    blocTest<LobbyDetailBloc, LobbyDetailState>(
+      'ignores a second tap while the first is in flight',
+      setUp: () =>
+          when(() => lobbies.deleteLobby(_lobbyId)).thenAnswer((_) async {}),
+      build: build,
+      seed: () => LobbyDetailState(
+        status: LobbyDetailStatus.ready,
+        lobby: _asAdmin,
+        isActing: true,
+      ),
+      act: (bloc) => bloc.add(const LobbyDetailDeleteRequested()),
+      expect: () => <LobbyDetailState>[],
+      verify: (_) => verifyNever(() => lobbies.deleteLobby(any())),
     );
   });
 }

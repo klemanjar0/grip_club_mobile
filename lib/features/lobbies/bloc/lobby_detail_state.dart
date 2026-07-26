@@ -3,7 +3,7 @@ part of 'lobby_detail_bloc.dart';
 enum LobbyDetailStatus { initial, loading, ready, failure }
 
 /// What just happened, so the view can show the right confirmation once.
-enum LobbyDetailOutcome { joined, requestSent, left, requestWithdrawn }
+enum LobbyDetailOutcome { joined, requestSent, left, requestWithdrawn, deleted }
 
 class LobbyDetailState extends Equatable {
   const LobbyDetailState({
@@ -20,7 +20,7 @@ class LobbyDetailState extends Equatable {
   final LobbyDetailStatus status;
   final Lobby? lobby;
 
-  /// A join or leave is in flight.
+  /// A join, leave or delete is in flight.
   final bool isActing;
 
   final String? errorMessage;

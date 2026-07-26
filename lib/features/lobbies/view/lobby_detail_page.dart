@@ -11,7 +11,8 @@ import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 
 /// One lobby in full, with the join / leave action for the current viewer.
 ///
-/// Admin tools (members, edit, delete, invite) are not here yet.
+/// An admin gets edit and delete in the app bar. Reviewing join requests and
+/// sharing the invite link are not here yet.
 class LobbyDetailPage extends StatelessWidget {
   const LobbyDetailPage({required this.lobbyId, this.initialLobby, super.key});
 
@@ -41,6 +42,7 @@ class _LobbyDetailView extends StatelessWidget {
       'Request sent — the organizer will review it.',
     LobbyDetailOutcome.left => 'You left the lobby.',
     LobbyDetailOutcome.requestWithdrawn => 'Request withdrawn.',
+    LobbyDetailOutcome.deleted => 'Lobby deleted.',
   };
 
   /// Opens the edit form and takes the saved lobby back from it. `PATCH`
@@ -55,6 +57,44 @@ class _LobbyDetailView extends StatelessWidget {
     );
 
     if (saved != null) bloc.add(LobbyDetailUpdated(saved));
+  }
+
+  /// Asks before deleting: it cannot be undone, and everyone who joined is
+  /// notified and loses the lobby.
+  Future<void> _confirmDelete(BuildContext context, Lobby lobby) async {
+    final bloc = context.read<LobbyDetailBloc>();
+    final colors = Theme.of(context).colorScheme;
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this lobby?'),
+        content: Text(
+          // `approved_count` includes the admin, so anything above one means
+          // other people are affected.
+          lobby.approvedCount > 1
+              ? 'Everyone who joined is notified and loses access. This cannot '
+                    'be undone.'
+              : 'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep lobby'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.error,
+              foregroundColor: colors.onError,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete ?? false) bloc.add(const LobbyDetailDeleteRequested());
   }
 
   Widget _body(BuildContext context, LobbyDetailState state) {
@@ -103,6 +143,15 @@ class _LobbyDetailView extends StatelessWidget {
             ..hideCurrentSnackBar()
             ..showSnackBar(SnackBar(content: Text(_outcomeMessage(outcome))));
 
+          // The lobby is gone: there is no page left to stand on, and it has to
+          // come out of both feeds. This page is pushed above the tab shell, so
+          // the feeds are out of reach through the tree.
+          if (outcome == LobbyDetailOutcome.deleted) {
+            refreshLobbyFeeds();
+            context.pop();
+            return;
+          }
+
           // Leaving a private lobby costs the viewer the right to read it, so
           // there is nothing left to show.
           if (state.accessLost) context.pop();
@@ -123,14 +172,25 @@ class _LobbyDetailView extends StatelessWidget {
           appBar: AppBar(
             title: Text(lobby?.name ?? 'Lobby'),
             actions: [
-              // Editing is the admin's only tool here so far; deleting the
-              // lobby and reviewing join requests are still to come.
-              if (lobby != null && lobby.viewer.isAdmin)
+              // The admin's tools. Reviewing join requests is still to come.
+              // Both are held shut while an action is in flight: a delete takes
+              // the lobby out from under the edit form.
+              if (lobby != null && lobby.viewer.isAdmin) ...[
                 IconButton(
                   tooltip: 'Edit lobby',
                   icon: const Icon(Icons.edit_outlined),
-                  onPressed: () => _edit(context, lobby),
+                  onPressed: state.isActing
+                      ? null
+                      : () => _edit(context, lobby),
                 ),
+                IconButton(
+                  tooltip: 'Delete lobby',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: state.isActing
+                      ? null
+                      : () => _confirmDelete(context, lobby),
+                ),
+              ],
             ],
           ),
           body: SafeArea(child: _body(context, state)),
@@ -295,8 +355,8 @@ class _DetailTile extends StatelessWidget {
 
 /// The one action available to this viewer, pinned to the bottom.
 ///
-/// Admins get nothing to press: they cannot leave their own lobby, and editing
-/// and deleting are not built yet.
+/// Admins get nothing to press: they cannot leave their own lobby, and their
+/// edit and delete live in the app bar.
 class _LobbyAction extends StatelessWidget {
   const _LobbyAction({required this.lobby, required this.isActing});
 

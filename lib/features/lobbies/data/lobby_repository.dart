@@ -66,8 +66,18 @@ class LobbyRepository {
     }
   }
 
+  /// `DELETE /lobbies/{id}` — admin only, answers `204` with no body.
+  ///
+  /// Every approved member is notified server-side, and the memberships and
+  /// notifications cascade, so there is nothing left to clean up here.
+  ///
+  /// Fails with `403 admin_only`, `403 not_a_member` or `404 lobby_not_found`.
   Future<void> deleteLobby(String lobbyId) async {
-    return Future.value(null);
+    try {
+      await _dio.delete<void>('/lobbies/$lobbyId');
+    } on DioException catch (exception) {
+      throw ApiException.fromDioException(exception);
+    }
   }
 
   Future<Lobby> update(

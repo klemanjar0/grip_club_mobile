@@ -286,4 +286,39 @@ void main() {
       );
     });
   });
+
+  group('deleteLobby', () {
+    const path = '/lobbies/a1b2c3d4-0000-4000-8000-000000000001';
+    const lobbyId = 'a1b2c3d4-0000-4000-8000-000000000001';
+
+    test('deletes the lobby and tolerates the empty 204 body', () async {
+      final repository = repositoryWith(<String, Stub>{
+        path: Stub(204, <String, dynamic>{}),
+      });
+
+      await repository.deleteLobby(lobbyId);
+
+      final request = adapter.requests.single;
+      expect(request.method, 'DELETE');
+      expect(request.path, path);
+    });
+
+    test('surfaces admin_only by code', () async {
+      final repository = repositoryWith(<String, Stub>{
+        path: Stub(
+          403,
+          errorBody('admin_only', 'Only the organizer can do that.'),
+        ),
+      });
+
+      await expectLater(
+        repository.deleteLobby(lobbyId),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.code, 'code', 'admin_only')
+              .having((e) => e.statusCode, 'statusCode', 403),
+        ),
+      );
+    });
+  });
 }

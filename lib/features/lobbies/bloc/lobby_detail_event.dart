@@ -32,3 +32,8 @@ final class LobbyDetailJoinRequested extends LobbyDetailEvent {
 final class LobbyDetailLeaveRequested extends LobbyDetailEvent {
   const LobbyDetailLeaveRequested();
 }
+
+/// Admin only, and irreversible — the view confirms before dispatching this.
+final class LobbyDetailDeleteRequested extends LobbyDetailEvent {
+  const LobbyDetailDeleteRequested();
+}
