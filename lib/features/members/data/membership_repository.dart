@@ -1,9 +1,11 @@
 import 'package:dio/dio.dart';
 
 import 'package:grip_club_mobile/core/network/api_exception.dart';
+import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
+import 'package:grip_club_mobile/features/members/domain/lobby_member.dart';
 import 'package:grip_club_mobile/features/members/domain/membership.dart';
 
-/// Joining and leaving lobbies, plus the admin's verdict on a join request.
+/// Joining and leaving lobbies, plus everything an admin does to the roster.
 ///
 /// Throws [ApiException] only — [DioException] never escapes this layer.
 class MembershipRepository {
@@ -11,6 +13,35 @@ class MembershipRepository {
   const MembershipRepository({required this._dio});
 
   final Dio _dio;
+
+  /// `GET /lobbies/{id}/members?status=…` — admin only.
+  ///
+  /// One roster per [status]; the `approved` one includes the creator. Ordered
+  /// by `joined_at` ascending and **not paginated**, so the whole list arrives
+  /// at once.
+  ///
+  /// Fails with `403 admin_only` for a member, `403 not_a_member` for anyone
+  /// else, and `404 lobby_not_found`.
+  Future<List<LobbyMember>> members(
+    String lobbyId, {
+    MembershipStatus status = MembershipStatus.approved,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/lobbies/$lobbyId/members',
+        queryParameters: <String, dynamic>{'status': status.name},
+      );
+
+      final data = response.data;
+      if (data == null) {
+        throw const ApiException('The server returned an empty roster.');
+      }
+
+      return LobbyMember.listFromJson(data);
+    } on DioException catch (exception) {
+      throw ApiException.fromDioException(exception);
+    }
+  }
 
   /// `POST /lobbies/{id}/join`.
   ///
@@ -82,6 +113,45 @@ class MembershipRepository {
   Future<void> reject(String lobbyId, String userId) async {
     try {
       await _dio.post<void>('/lobbies/$lobbyId/members/$userId/reject');
+    } on DioException catch (exception) {
+      throw ApiException.fromDioException(exception);
+    }
+  }
+
+  /// `POST /lobbies/{id}/members/{userID}/ban` — admin only.
+  ///
+  /// The terminal verdict, and the one thing [reject] and [remove] are not:
+  /// it upserts a `banned` row, and a row that exists is what makes rejoining
+  /// impossible. Works on anyone, including someone who was never a member.
+  ///
+  /// Fails with the same codes as [approve].
+  Future<Membership> ban(String lobbyId, String userId) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/lobbies/$lobbyId/members/$userId/ban',
+      );
+
+      final data = response.data;
+      if (data == null) {
+        throw const ApiException('The server returned an empty membership.');
+      }
+
+      return Membership.fromJson(data);
+    } on DioException catch (exception) {
+      throw ApiException.fromDioException(exception);
+    }
+  }
+
+  /// `DELETE /lobbies/{id}/members/{userID}` — admin only, `204`.
+  ///
+  /// Deletes the membership row whatever state it was in, so this both takes an
+  /// approved member out and lifts a ban: with no row left, the person may join
+  /// again. They are notified either way.
+  ///
+  /// Fails with the same codes as [approve].
+  Future<void> remove(String lobbyId, String userId) async {
+    try {
+      await _dio.delete<void>('/lobbies/$lobbyId/members/$userId');
     } on DioException catch (exception) {
       throw ApiException.fromDioException(exception);
     }

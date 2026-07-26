@@ -20,6 +20,7 @@ import 'package:grip_club_mobile/features/lobbies/bloc/lobby_feed_event.dart';
 import 'package:grip_club_mobile/features/lobbies/data/lobby_repository.dart';
 import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 import 'package:grip_club_mobile/features/members/bloc/join_request_bloc.dart';
+import 'package:grip_club_mobile/features/members/bloc/lobby_members_bloc.dart';
 import 'package:grip_club_mobile/features/members/data/membership_repository.dart';
 import 'package:grip_club_mobile/features/notifications/bloc/notifications_badge_bloc.dart';
 import 'package:grip_club_mobile/features/notifications/bloc/notifications_bloc.dart';
@@ -120,6 +121,12 @@ Future<void> configureDependencies() async {
         lobbies: getIt<LobbyRepository>(),
         memberships: getIt<MembershipRepository>(),
         initialLobby: initialLobby,
+      ),
+    )
+    ..registerFactoryParam<LobbyMembersBloc, String, void>(
+      (lobbyId, _) => LobbyMembersBloc(
+        lobbyId: lobbyId,
+        memberships: getIt<MembershipRepository>(),
       ),
     )
     // Scoped to the sheet that shows one pending request: the lobby and the

@@ -34,6 +34,10 @@ abstract final class Routes {
   static const String editLobby = '/lobbies/:lobbyId/edit';
   static const String editLobbyName = 'edit-lobby';
 
+  /// Admin only, pushed from [lobbyDetail]. The roster, and the actions on it.
+  static const String lobbyMembers = '/lobbies/:lobbyId/members';
+  static const String lobbyMembersName = 'lobby-members';
+
   /// The `+` in the middle of the tab bar. Deliberately *not* `/lobbies/create`
   /// — that would collide with [lobbyDetail]'s `:lobbyId`.
   static const String createLobby = '/create-lobby';

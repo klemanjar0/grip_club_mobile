@@ -13,8 +13,8 @@ import 'package:grip_club_mobile/features/lobbies/domain/lobby.dart';
 
 /// One lobby in full, with the join / leave action for the current viewer.
 ///
-/// An admin gets edit and delete in the app bar. Reviewing join requests and
-/// sharing the invite link are not here yet.
+/// An admin gets edit and delete in the app bar, and the roster from the body.
+/// Sharing the invite link is not here yet.
 class LobbyDetailPage extends StatelessWidget {
   const LobbyDetailPage({required this.lobbyId, this.initialLobby, super.key});
 
@@ -174,9 +174,10 @@ class _LobbyDetailView extends StatelessWidget {
           appBar: AppBar(
             title: Text(lobby?.name ?? 'Lobby'),
             actions: [
-              // The admin's tools. Reviewing join requests is still to come.
-              // Both are held shut while an action is in flight: a delete takes
-              // the lobby out from under the edit form.
+              // The admin's tools. Managing the roster lives in the body, next
+              // to the count it changes. Both of these are held shut while an
+              // action is in flight: a delete takes the lobby out from under
+              // the edit form.
               if (lobby != null && lobby.viewer.isAdmin) ...[
                 IconButton(
                   tooltip: 'Edit lobby',
@@ -262,6 +263,26 @@ class _LobbyBody extends StatelessWidget {
 
   final Lobby lobby;
 
+  /// Opens the roster, then re-reads the lobby: approving, banning and removing
+  /// all move `approved_count`, which this page shows.
+  ///
+  /// Re-read unconditionally rather than on a result handed back by the roster.
+  /// Returning one would mean intercepting the pop, and a route that intercepts
+  /// its own pop loses the iOS swipe-back gesture — a worse trade than one GET
+  /// after a look that changed nothing. The feeds are refreshed by the roster
+  /// itself, where a change actually lands.
+  Future<void> _openMembers(BuildContext context) async {
+    final bloc = context.read<LobbyDetailBloc>();
+
+    await context.pushNamed<void>(
+      Routes.lobbyMembersName,
+      pathParameters: <String, String>{'lobbyId': lobby.id},
+      extra: lobby.name,
+    );
+
+    bloc.add(const LobbyDetailRequested());
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -325,6 +346,17 @@ class _LobbyBody extends StatelessWidget {
           title: lobby.creator.displayName,
           subtitle: 'Organizer',
         ),
+        // The way in to the roster. Only the admin may read it — everyone else
+        // gets `403 admin_only` — so only the admin is offered it.
+        if (lobby.viewer.isAdmin)
+          _DetailTile(
+            icon: Icons.groups_outlined,
+            title: 'Manage members',
+            subtitle: lobby.isPrivate
+                ? 'Approve requests, remove or ban people'
+                : 'Remove or ban people',
+            onTap: () => _openMembers(context),
+          ),
         if (lobby.chatLink case final chatLink?)
           _DetailTile(
             icon: Icons.chat_bubble_outline,
@@ -353,11 +385,20 @@ class _LobbyBody extends StatelessWidget {
 }
 
 class _DetailTile extends StatelessWidget {
-  const _DetailTile({required this.icon, required this.title, this.subtitle});
+  const _DetailTile({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.onTap,
+  });
 
   final IconData icon;
   final String title;
   final String? subtitle;
+
+  /// Makes the row a control. Everything else here is read-only, so the
+  /// chevron is what tells the two apart.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -366,6 +407,8 @@ class _DetailTile extends StatelessWidget {
       leading: Icon(icon),
       title: Text(title),
       subtitle: subtitle == null ? null : Text(subtitle!),
+      trailing: onTap == null ? null : const Icon(Icons.chevron_right),
+      onTap: onTap,
     );
   }
 }

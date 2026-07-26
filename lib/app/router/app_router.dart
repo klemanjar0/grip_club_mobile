@@ -16,6 +16,7 @@ import 'package:grip_club_mobile/features/lobbies/view/edit_lobby_page.dart';
 import 'package:grip_club_mobile/features/lobbies/view/lobbies_page.dart';
 import 'package:grip_club_mobile/features/lobbies/view/lobby_detail_page.dart';
 import 'package:grip_club_mobile/features/lobbies/view/my_lobbies_page.dart';
+import 'package:grip_club_mobile/features/members/view/lobby_members_page.dart';
 import 'package:grip_club_mobile/features/notifications/view/notifications_page.dart';
 import 'package:grip_club_mobile/features/profile/view/profile_page.dart';
 
@@ -129,6 +130,17 @@ GoRouter createRouter(AuthBloc authBloc) => GoRouter(
       builder: (context, state) => EditLobbyPage(
         lobbyId: state.pathParameters['lobbyId'] ?? '',
         initialLobby: state.extra is Lobby ? state.extra! as Lobby : null,
+      ),
+    ),
+    GoRoute(
+      path: Routes.lobbyMembers,
+      name: Routes.lobbyMembersName,
+      parentNavigatorKey: _rootNavigatorKey,
+      // `extra` is the lobby's name, for the header. Like the lobby itself on
+      // the routes above it, it is an optimisation and not a requirement.
+      builder: (context, state) => LobbyMembersPage(
+        lobbyId: state.pathParameters['lobbyId'] ?? '',
+        lobbyName: state.extra is String ? state.extra! as String : null,
       ),
     ),
     GoRoute(
