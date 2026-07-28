@@ -4,6 +4,11 @@ abstract final class Routes {
   static const String splash = '/splash';
   static const String splashName = 'splash';
 
+  /// Where the guard parks the app when the backend did not answer at startup.
+  /// Reachable in that state only — retrying goes back through [splash].
+  static const String maintenance = '/maintenance';
+  static const String maintenanceName = 'maintenance';
+
   static const String login = '/login';
   static const String loginName = 'login';
 

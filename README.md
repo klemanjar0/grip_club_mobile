@@ -101,7 +101,7 @@ lib/
     network/                       Dio factory, auth interceptor, ApiException
     storage/token_storage.dart     session token in SharedPreferences
   features/
-    auth/                          bloc, repository, User, splash + login + register pages
+    auth/                          bloc, repository, User, splash + maintenance + login + register pages
     home/                          home page
 ```
 
@@ -111,18 +111,48 @@ lib/
 2. `AuthBloc` starts in `AuthStatus.unknown`; the router guard holds on `/splash`. The native launch
    screen paints the same colour, so the OS → Flutter handover is invisible.
 3. If an unexpired token is on disk, `GET /me` resolves it into a profile → `authenticated`. No token,
-   or one whose stored `expires_at` has passed → `unauthenticated`, with no wasted request.
-4. The router's `refreshListenable` is fed by `AuthBloc.stream`, so every status change re-runs the
+   or one whose stored `expires_at` has passed → `unauthenticated`, after a bare `GET /me` used only
+   as a reachability probe (see below).
+4. If the backend does not answer — a timeout, a dead connection, a rejected certificate or a `5xx` —
+   the status becomes `unavailable` and the guard parks the app on `/maintenance`. A `4xx` is *not*
+   an outage and still lands on `/login` with its message. **Retry** re-dispatches `AuthStarted`,
+   which puts the status back to `unknown`; the guard returns to `/splash` and the launch runs again
+   from the top. `/maintenance` is unreachable in any other state.
+5. The router's `refreshListenable` is fed by `AuthBloc.stream`, so every status change re-runs the
    redirect. Logging in, registering or signing out navigates on its own — no `context.go` in the
    auth flow. `/login` and `/register` are the only routes reachable while signed out.
-5. `AuthInterceptor` attaches `Authorization: Bearer <token>` to every request; on a `401` it clears
+6. `AuthInterceptor` attaches `Authorization: Bearer <token>` to every request; on a `401` it clears
    the token and dispatches `AuthSessionExpired`, which sends the user back to `/login`.
+
+A signed-out launch has no session to restore, but it still has to notice a dead backend — otherwise
+a fresh install meets a login form that cannot possibly work. So it calls `AuthRepository.ensureServerReachable()`,
+a bare `GET /me`: **any** HTTP response proves the server is up, so the `401` it earns without a token
+is swallowed, and only a no-response failure or a `5xx` is rethrown. It reuses `/me` because the API
+exposes no health endpoint; give it one and this is the single place to point at it.
+
+The maintenance screen shows the transport-level reason (`No internet connection.`) under the
+maintenance copy, so an offline user is not told the servers are down — the two failures are
+indistinguishable from the client.
 
 `POST /auth/login` and `POST /auth/register` both return a token plus a *thin* user, so the
 repository persists the token and then fetches `GET /me` for the full profile — one `User` shape
 everywhere. Failures arrive as `{"error": {code, message, details}}`; `ApiException` carries `code`
 and `details` through to the forms, which show `validation_failed` and `email_taken` on the field
 they belong to. See [`API.md`](API.md) for the full contract.
+
+### Home location
+
+Sign-up is a two-step `Stepper`: credentials first, then the country and city the user is based in.
+Both location fields are optional — a blank one is dropped from `POST /auth/register` rather than
+sent — and each step validates its own `Form`, so a rejected email sends the flow back to the step
+that owns the field.
+
+That pair is the user's home location, editable afterwards from the Profile tab (`PATCH /me`):
+
+- **city** is the saved browse filter the Lobbies tab starts from; empty means every city.
+- **country + city** prefill the create-lobby form. The prefill is client-side and visible: the form
+  always sends both fields, so the API's own defaulting — which only applies when *neither* is sent —
+  never comes into play, and the user can type over either one before saving.
 
 ### Native launch screen
 

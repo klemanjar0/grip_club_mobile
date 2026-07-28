@@ -7,6 +7,7 @@ import 'package:grip_club_mobile/app/config/app_config.dart';
 import 'package:grip_club_mobile/app/router/routes.dart';
 import 'package:grip_club_mobile/features/auth/bloc/auth_bloc.dart';
 import 'package:grip_club_mobile/features/auth/view/login_page.dart';
+import 'package:grip_club_mobile/features/auth/view/maintenance_page.dart';
 import 'package:grip_club_mobile/features/auth/view/register_page.dart';
 import 'package:grip_club_mobile/features/auth/view/splash_page.dart';
 import 'package:grip_club_mobile/features/dashboard/view/dashboard_page.dart';
@@ -42,12 +43,20 @@ GoRouter createRouter(AuthBloc authBloc) => GoRouter(
     return switch (authBloc.state.status) {
       // Still validating the stored token: hold on the splash screen.
       AuthStatus.unknown => location == Routes.splash ? null : Routes.splash,
+      // The backend never answered, so no route can work. Retrying returns the
+      // status to `unknown`, which sends the app back to the splash screen.
+      AuthStatus.unavailable =>
+        location == Routes.maintenance ? null : Routes.maintenance,
       // Both auth screens are reachable while signed out; anything else is not.
       AuthStatus.unauthenticated => isAuthRoute ? null : Routes.login,
       // Everything else — the dashboard, its tabs, the pages above it — is
       // allowed, so signed-in routes need no per-route guard.
       AuthStatus.authenticated =>
-        isAuthRoute || location == Routes.splash ? Routes.home : null,
+        isAuthRoute ||
+                location == Routes.splash ||
+                location == Routes.maintenance
+            ? Routes.home
+            : null,
     };
   },
   routes: <RouteBase>[
@@ -55,6 +64,11 @@ GoRouter createRouter(AuthBloc authBloc) => GoRouter(
       path: Routes.splash,
       name: Routes.splashName,
       builder: (context, state) => const SplashPage(),
+    ),
+    GoRoute(
+      path: Routes.maintenance,
+      name: Routes.maintenanceName,
+      builder: (context, state) => const MaintenancePage(),
     ),
     GoRoute(
       path: Routes.login,

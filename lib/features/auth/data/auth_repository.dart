@@ -25,11 +25,23 @@ class AuthRepository {
       });
 
   /// Registering signs you in: the response already carries a live session.
-  Future<User> register({required String email, required String password}) =>
-      _authenticate('/auth/register', <String, dynamic>{
-        'email': email,
-        'password': password,
-      });
+  ///
+  /// [country] and [city] are the caller's home location. Both are optional —
+  /// the sign-up flow lets them be skipped — and become the defaults the
+  /// create-lobby form is filled in with; [city] is also the browse filter's
+  /// default. A blank one is dropped rather than sent, which is the same thing
+  /// as never answering: the server stores `''` for an absent key.
+  Future<User> register({
+    required String email,
+    required String password,
+    String? country,
+    String? city,
+  }) => _authenticate('/auth/register', <String, dynamic>{
+    'email': email,
+    'password': password,
+    'country': ?_trimToNull(country),
+    'city': ?_trimToNull(city),
+  });
 
   /// Restores the session: resolves the stored token into a [User].
   Future<User> currentUser() async {
@@ -42,6 +54,22 @@ class AuthRepository {
       return User.fromJson(data);
     } on DioException catch (exception) {
       throw ApiException.fromDioException(exception);
+    }
+  }
+
+  /// Confirms the backend is answering, for a launch that has no session to
+  /// restore and would otherwise make no request at all.
+  ///
+  /// Any HTTP response proves the point, so only [ApiException.isServerUnavailable]
+  /// failures are rethrown — a `401` from `/me` without a token is a *healthy*
+  /// server saying no, and is swallowed here. Reusing `/me` keeps this off a
+  /// dedicated health endpoint the API does not have.
+  Future<void> ensureServerReachable() async {
+    try {
+      await _dio.get<void>('/me');
+    } on DioException catch (exception) {
+      final failure = ApiException.fromDioException(exception);
+      if (failure.isServerUnavailable) throw failure;
     }
   }
 
@@ -124,5 +152,11 @@ class AuthRepository {
     }
 
     return currentUser();
+  }
+
+  static String? _trimToNull(String? value) {
+    final trimmed = value?.trim();
+
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 }

@@ -26,6 +26,7 @@ void main() {
   setUp(() {
     repository = _MockAuthRepository();
     when(repository.logout).thenAnswer((_) async {});
+    when(repository.ensureServerReachable).thenAnswer((_) async {});
   });
 
   group('AuthStarted', () {
@@ -36,8 +37,87 @@ void main() {
       act: (bloc) => bloc.add(const AuthStarted()),
       wait: _pastSplashFloor,
       expect: () => const <AuthState>[AuthState.unauthenticated()],
-      // An expired or absent token must not cost a doomed round trip.
+      // An expired or absent token must not cost a doomed session restore —
+      // only the reachability probe, which is what catches a dead backend.
       verify: (_) => verifyNever(repository.currentUser),
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'is unavailable when the server does not answer the probe',
+      setUp: () {
+        when(() => repository.hasStoredSession).thenReturn(false);
+        when(repository.ensureServerReachable).thenThrow(
+          const ApiException(
+            'No internet connection.',
+            isTransportFailure: true,
+          ),
+        );
+      },
+      build: () => AuthBloc(repository: repository),
+      act: (bloc) => bloc.add(const AuthStarted()),
+      wait: _pastSplashFloor,
+      expect: () => const <AuthState>[
+        AuthState.unavailable(errorMessage: 'No internet connection.'),
+      ],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'is unavailable when restoring the session times out',
+      setUp: () {
+        when(() => repository.hasStoredSession).thenReturn(true);
+        when(repository.currentUser).thenThrow(
+          const ApiException(
+            'The server took too long to respond. Please try again.',
+            isTransportFailure: true,
+          ),
+        );
+      },
+      build: () => AuthBloc(repository: repository),
+      act: (bloc) => bloc.add(const AuthStarted()),
+      wait: _pastSplashFloor,
+      expect: () => const <AuthState>[
+        AuthState.unavailable(
+          errorMessage:
+              'The server took too long to respond. Please try again.',
+        ),
+      ],
+      // The token is untouched: the server never said it was bad.
+      verify: (_) => verifyNever(repository.logout),
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'is unavailable when the session check comes back 5xx',
+      setUp: () {
+        when(() => repository.hasStoredSession).thenReturn(true);
+        when(
+          repository.currentUser,
+        ).thenThrow(const ApiException('Under maintenance.', statusCode: 503));
+      },
+      build: () => AuthBloc(repository: repository),
+      act: (bloc) => bloc.add(const AuthStarted()),
+      wait: _pastSplashFloor,
+      expect: () => const <AuthState>[
+        AuthState.unavailable(errorMessage: 'Under maintenance.'),
+      ],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'retrying from the maintenance screen goes back through unknown',
+      setUp: () {
+        when(() => repository.hasStoredSession).thenReturn(true);
+        when(repository.currentUser).thenAnswer((_) async => _user);
+      },
+      // Starts where a failed launch left the app.
+      seed: () => const AuthState.unavailable(errorMessage: 'Offline.'),
+      build: () => AuthBloc(repository: repository),
+      act: (bloc) => bloc.add(const AuthStarted()),
+      wait: _pastSplashFloor,
+      // `unknown` is what sends the router back to the splash screen, so the
+      // whole launch flow restarts rather than resuming under the error.
+      expect: () => <AuthState>[
+        const AuthState.unknown(),
+        AuthState.authenticated(_user),
+      ],
     );
 
     blocTest<AuthBloc, AuthState>(
@@ -71,18 +151,20 @@ void main() {
     );
 
     blocTest<AuthBloc, AuthState>(
-      'reports a non-401 failure and keeps the token for the next launch',
+      'reports a non-401 client failure and keeps the token for the next launch',
       setUp: () {
         when(() => repository.hasStoredSession).thenReturn(true);
-        when(
-          repository.currentUser,
-        ).thenThrow(const ApiException('No internet connection.'));
+        // A 4xx is this client asking wrongly, not an outage: it belongs on the
+        // login screen with its message, not on the maintenance screen.
+        when(repository.currentUser).thenThrow(
+          const ApiException('Your account is suspended.', statusCode: 403),
+        );
       },
       build: () => AuthBloc(repository: repository),
       act: (bloc) => bloc.add(const AuthStarted()),
       wait: _pastSplashFloor,
       expect: () => const <AuthState>[
-        AuthState.unauthenticated(errorMessage: 'No internet connection.'),
+        AuthState.unauthenticated(errorMessage: 'Your account is suspended.'),
       ],
       verify: (_) => verifyNever(repository.logout),
     );
@@ -165,6 +247,39 @@ void main() {
         const AuthState.submitting(),
         AuthState.authenticated(_user),
       ],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'carries the home location from the second step through',
+      setUp: () => when(
+        () => repository.register(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+          country: any(named: 'country'),
+          city: any(named: 'city'),
+        ),
+      ).thenAnswer((_) async => _user),
+      build: () => AuthBloc(repository: repository),
+      act: (bloc) => bloc.add(
+        const AuthRegisterRequested(
+          email: 'rider@example.com',
+          password: 'correct-horse',
+          country: 'Ukraine',
+          city: 'Kyiv',
+        ),
+      ),
+      expect: () => <AuthState>[
+        const AuthState.submitting(),
+        AuthState.authenticated(_user),
+      ],
+      verify: (_) => verify(
+        () => repository.register(
+          email: 'rider@example.com',
+          password: 'correct-horse',
+          country: 'Ukraine',
+          city: 'Kyiv',
+        ),
+      ).called(1),
     );
 
     blocTest<AuthBloc, AuthState>(

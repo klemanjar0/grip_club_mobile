@@ -17,8 +17,11 @@ class UserRepository {
   ///
   /// Omitted keys are left unchanged server-side, so only non-null arguments go
   /// into the body. None of the text fields are nullable, which is why there is
-  /// no way to "clear" one: sending `''` for [displayName] or [city] resets it
-  /// to the empty default instead.
+  /// no way to "clear" one: sending `''` for [displayName], [country] or [city]
+  /// resets it to the empty default instead.
+  ///
+  /// [country] and [city] are the home location: the pair a new lobby starts
+  /// from, with [city] doubling as the saved browse filter.
   ///
   /// [avatarFileId] is the exception, and the reason it is an [Optional]: an
   /// explicit `null` there *removes* the picture, while leaving the argument
@@ -28,6 +31,7 @@ class UserRepository {
     String? displayName,
     String? locale,
     String? timezone,
+    String? country,
     String? city,
     String? timeFilter,
     Optional<String>? avatarFileId,
@@ -36,6 +40,7 @@ class UserRepository {
       'display_name': ?displayName,
       'locale': ?locale,
       'timezone': ?timezone,
+      'country': ?country,
       'city': ?city,
       'time_filter': ?timeFilter,
       // Present-and-null is the whole point here: the key has to be in the body

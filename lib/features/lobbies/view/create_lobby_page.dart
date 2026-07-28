@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:grip_club_mobile/app/di/injector.dart';
+import 'package:grip_club_mobile/features/auth/bloc/auth_bloc.dart';
 import 'package:grip_club_mobile/features/lobbies/bloc/create_lobby_bloc.dart';
 import 'package:grip_club_mobile/features/lobbies/view/widgets/lobby_form.dart';
 
@@ -24,6 +25,12 @@ class _CreateLobbyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The home location saved at sign-up or on the profile. Filling the two
+    // fields in is what "defaults" means here: the form always sends both, so
+    // the server's own defaulting — which only applies when *neither* is sent —
+    // never gets the chance to.
+    final home = context.select((AuthBloc bloc) => bloc.state.user);
+
     return Scaffold(
       appBar: AppBar(title: const Text('New lobby')),
       body: BlocConsumer<CreateLobbyBloc, CreateLobbyState>(
@@ -62,6 +69,8 @@ class _CreateLobbyView extends StatelessWidget {
         builder: (context, state) => SafeArea(
           child: LobbyForm(
             submitLabel: 'Create lobby',
+            defaultCountry: home?.country,
+            defaultCity: home?.city,
             isSubmitting: state.isSubmitting,
             fieldErrors: state.fieldErrors,
             onSubmit: (draft) => context.read<CreateLobbyBloc>().add(

@@ -10,6 +10,7 @@ class ApiException implements Exception {
     this.statusCode,
     this.code,
     this.fieldErrors = const {},
+    this.isTransportFailure = false,
   });
 
   /// Translates a Dio failure into a user-facing message.
@@ -22,12 +23,15 @@ class ApiException implements Exception {
       DioExceptionType.receiveTimeout ||
       DioExceptionType.transformTimeout => const ApiException(
         'The server took too long to respond. Please try again.',
+        isTransportFailure: true,
       ),
       DioExceptionType.connectionError => const ApiException(
         'No internet connection.',
+        isTransportFailure: true,
       ),
       DioExceptionType.badCertificate => const ApiException(
         'The server certificate could not be verified.',
+        isTransportFailure: true,
       ),
       DioExceptionType.cancel => const ApiException('Request cancelled.'),
       DioExceptionType.badResponse => _fromResponse(
@@ -53,7 +57,21 @@ class ApiException implements Exception {
   /// `validation_failed`; empty for every other failure.
   final Map<String, String> fieldErrors;
 
+  /// True when the request never got an answer at all — a timeout, a dead
+  /// connection, a certificate the client would not accept. [statusCode] is
+  /// always `null` in that case, which is why it needs its own flag.
+  final bool isTransportFailure;
+
   bool get isUnauthorized => statusCode == 401;
+
+  /// True when the failure points at the backend rather than at the request:
+  /// nothing came back, or what came back was a 5xx.
+  ///
+  /// Startup keys the maintenance screen off this. A 4xx is deliberately not
+  /// included — that is this client asking for the wrong thing, and it would be
+  /// a lie to blame it on an outage.
+  bool get isServerUnavailable =>
+      isTransportFailure || (statusCode != null && statusCode! >= 500);
 
   bool get isEmailTaken => code == 'email_taken';
 

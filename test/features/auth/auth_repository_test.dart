@@ -59,6 +59,22 @@ class _StubAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+/// A server that is simply not there — every request dies on the connection.
+class _DeadAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async => throw DioException.connectionError(
+    requestOptions: options,
+    reason: 'Connection refused',
+  );
+
+  @override
+  void close({bool force = false}) {}
+}
+
 /// `CredentialsResponse` — the shape returned by register and login.
 const Map<String, dynamic> _credentials = <String, dynamic>{
   'token': 'opaque-session-token',
@@ -77,6 +93,7 @@ const Map<String, dynamic> _profile = <String, dynamic>{
   'display_name': 'rider',
   'locale': 'en',
   'timezone': 'Europe/Kyiv',
+  'country': 'Ukraine',
   'city': 'Kyiv',
   'time_filter': 'week',
   'created_at': '2026-08-24T18:30:00Z',
@@ -141,6 +158,7 @@ void main() {
         expect(user.email, 'rider@example.com');
         expect(user.displayName, 'rider');
         expect(user.timezone, 'Europe/Kyiv');
+        expect(user.country, 'Ukraine');
         expect(user.city, 'Kyiv');
         expect(user.timeFilter, 'week');
 
@@ -225,6 +243,54 @@ void main() {
       expect(adapter.requests.map((r) => r.path), ['/auth/register', '/me']);
     });
 
+    test('sends the home location the second step asked for', () async {
+      final repository = repositoryWith(
+        storage: await storageWith(),
+        responses: <String, _Stub>{
+          '/auth/register': const _Stub(201, _credentials),
+          '/me': const _Stub(200, _profile),
+        },
+      );
+
+      await repository.register(
+        email: 'rider@example.com',
+        password: 'correct-horse',
+        country: '  Ukraine  ',
+        city: '  Kyiv  ',
+      );
+
+      expect(adapter.requests.first.data, <String, dynamic>{
+        'email': 'rider@example.com',
+        'password': 'correct-horse',
+        'country': 'Ukraine',
+        'city': 'Kyiv',
+      });
+    });
+
+    test('omits a location the sign-up left empty', () async {
+      final repository = repositoryWith(
+        storage: await storageWith(),
+        responses: <String, _Stub>{
+          '/auth/register': const _Stub(201, _credentials),
+          '/me': const _Stub(200, _profile),
+        },
+      );
+
+      // Blank is how "skipped" arrives from the form, and an absent key is what
+      // the API reads as "not answered".
+      await repository.register(
+        email: 'rider@example.com',
+        password: 'correct-horse',
+        country: '',
+        city: '   ',
+      );
+
+      expect(adapter.requests.first.data, <String, dynamic>{
+        'email': 'rider@example.com',
+        'password': 'correct-horse',
+      });
+    });
+
     test('surfaces email_taken', () async {
       final storage = await storageWith();
       final repository = repositoryWith(
@@ -275,6 +341,60 @@ void main() {
                 'email': 'must be a valid email address',
                 'password': 'must be at least 8 characters long',
               }),
+        ),
+      );
+    });
+  });
+
+  group('ensureServerReachable', () {
+    test('a 401 from /me proves the server is up', () async {
+      final storage = await storageWith();
+      final repository = repositoryWith(
+        storage: storage,
+        responses: <String, _Stub>{
+          '/me': _Stub(401, _errorBody('unauthorized', 'Missing token.')),
+        },
+      );
+
+      await expectLater(repository.ensureServerReachable(), completes);
+      expect(adapter.requests.map((r) => r.path), ['/me']);
+    });
+
+    test('throws when the server answers with a 5xx', () async {
+      final storage = await storageWith();
+      final repository = repositoryWith(
+        storage: storage,
+        responses: <String, _Stub>{
+          '/me': _Stub(503, _errorBody('unavailable', 'Under maintenance.')),
+        },
+      );
+
+      await expectLater(
+        repository.ensureServerReachable(),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.isServerUnavailable,
+            'isServerUnavailable',
+            isTrue,
+          ),
+        ),
+      );
+    });
+
+    test('throws when nothing answers at all', () async {
+      final storage = await storageWith();
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.example.test/api/v1'))
+        ..httpClientAdapter = _DeadAdapter();
+      final repository = AuthRepository(dio: dio, tokenStorage: storage);
+
+      await expectLater(
+        repository.ensureServerReachable(),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.isTransportFailure,
+            'isTransportFailure',
+            isTrue,
+          ),
         ),
       );
     });

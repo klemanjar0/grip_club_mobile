@@ -42,6 +42,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         displayName: event.displayName,
         locale: event.locale,
         timezone: event.timezone,
+        country: event.country,
         city: event.city,
         timeFilter: event.timeFilter,
       );

@@ -15,6 +15,7 @@ class User extends Equatable {
     required this.createdAt,
     this.locale = 'en',
     this.timezone = 'UTC',
+    this.country = '',
     this.city = '',
     this.timeFilter = 'all',
     this.avatar,
@@ -31,6 +32,7 @@ class User extends Equatable {
     },
     locale: json['locale'] as String? ?? 'en',
     timezone: json['timezone'] as String? ?? 'UTC',
+    country: json['country'] as String? ?? '',
     city: json['city'] as String? ?? '',
     timeFilter: json['time_filter'] as String? ?? 'all',
     avatar: RemoteImage.fromJson(json['avatar']),
@@ -47,7 +49,11 @@ class User extends Equatable {
   /// IANA timezone name.
   final String timezone;
 
-  /// Saved browsing default; `''` means everywhere.
+  /// Home country; `''` when never set. Not a browsing filter — it is there so
+  /// the create-lobby form can be filled in for you.
+  final String country;
+
+  /// Home city, and the saved browsing default; `''` means everywhere.
   final String city;
 
   /// Saved browsing default: `day` | `week` | `month` | `all`.
@@ -65,6 +71,7 @@ class User extends Equatable {
     displayName,
     locale,
     timezone,
+    country,
     city,
     timeFilter,
     avatar,

@@ -23,14 +23,24 @@ final class AuthLoginRequested extends AuthEvent {
 }
 
 /// Registering also signs the user in — there is no separate login step.
+///
+/// [country] and [city] are the home location the second step of the sign-up
+/// asks for. They are `null` when that step was skipped.
 final class AuthRegisterRequested extends AuthEvent {
-  const AuthRegisterRequested({required this.email, required this.password});
+  const AuthRegisterRequested({
+    required this.email,
+    required this.password,
+    this.country,
+    this.city,
+  });
 
   final String email;
   final String password;
+  final String? country;
+  final String? city;
 
   @override
-  List<Object?> get props => [email, password];
+  List<Object?> get props => [email, password, country, city];
 }
 
 final class AuthLogoutRequested extends AuthEvent {

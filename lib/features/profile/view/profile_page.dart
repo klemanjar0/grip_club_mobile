@@ -7,6 +7,7 @@ import 'package:grip_club_mobile/core/images/avatar_selection.dart';
 import 'package:grip_club_mobile/core/ui/avatar_field.dart';
 import 'package:grip_club_mobile/features/auth/bloc/auth_bloc.dart';
 import 'package:grip_club_mobile/features/auth/domain/user.dart';
+import 'package:grip_club_mobile/features/auth/view/auth_validators.dart';
 import 'package:grip_club_mobile/features/profile/bloc/profile_bloc.dart';
 import 'package:grip_club_mobile/features/profile/view/password_section.dart';
 
@@ -161,6 +162,7 @@ class _PreferencesSectionState extends State<_PreferencesSection> {
 
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _displayNameController;
+  late final TextEditingController _countryController;
   late final TextEditingController _cityController;
   late final TextEditingController _timezoneController;
   late String _locale;
@@ -172,6 +174,7 @@ class _PreferencesSectionState extends State<_PreferencesSection> {
     _displayNameController = TextEditingController(
       text: widget.user.displayName,
     );
+    _countryController = TextEditingController(text: widget.user.country);
     _cityController = TextEditingController(text: widget.user.city);
     _timezoneController = TextEditingController(text: widget.user.timezone);
     _locale = _locales.containsKey(widget.user.locale)
@@ -185,6 +188,7 @@ class _PreferencesSectionState extends State<_PreferencesSection> {
   @override
   void dispose() {
     _displayNameController.dispose();
+    _countryController.dispose();
     _cityController.dispose();
     _timezoneController.dispose();
     super.dispose();
@@ -198,6 +202,7 @@ class _PreferencesSectionState extends State<_PreferencesSection> {
         displayName: _displayNameController.text.trim(),
         locale: _locale,
         timezone: _timezoneController.text.trim(),
+        country: _countryController.text.trim(),
         city: _cityController.text.trim(),
         timeFilter: _timeFilter,
       ),
@@ -229,17 +234,28 @@ class _PreferencesSectionState extends State<_PreferencesSection> {
                     : null,
               ),
               const SizedBox(height: 16),
+              // The home location. The pair fills in a new lobby's country and
+              // city; the city alone is also what the Lobbies tab browses.
+              TextFormField(
+                controller: _countryController,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
+                  labelText: 'Country',
+                  helperText: 'Fills in a new lobby',
+                  errorText: state.fieldErrors['country'],
+                ),
+                validator: AuthValidators.place,
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _cityController,
                 textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
-                  labelText: 'Default city',
-                  helperText: 'Empty means every city',
+                  labelText: 'City',
+                  helperText: 'Browsed by default; empty means every city',
                   errorText: state.fieldErrors['city'],
                 ),
-                validator: (value) => (value ?? '').trim().length > 120
-                    ? 'Keep it under 120 characters'
-                    : null,
+                validator: AuthValidators.place,
               ),
               const SizedBox(height: 16),
               TextFormField(

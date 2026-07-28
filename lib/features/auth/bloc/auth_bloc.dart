@@ -28,12 +28,27 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   final AuthRepository _repository;
 
+  /// Also the retry path: the maintenance screen re-dispatches [AuthStarted],
+  /// and going back through [AuthStatus.unknown] is what returns the router to
+  /// the splash screen so the whole flow restarts from the top.
   Future<void> _onStarted(AuthStarted event, Emitter<AuthState> emit) async {
+    if (state.status != AuthStatus.unknown) emit(const AuthState.unknown());
+
     // Started before the work, awaited after it, so the check and the floor
     // overlap instead of adding up.
     final splashFloor = Future<void>.delayed(_minimumSplashDuration);
 
     if (!_repository.hasStoredSession) {
+      // Nothing to restore, but the launch still has to notice a dead backend —
+      // otherwise a fresh install meets a login form that cannot possibly work.
+      try {
+        await _repository.ensureServerReachable();
+      } on ApiException catch (exception) {
+        await splashFloor;
+        emit(AuthState.unavailable(errorMessage: exception.message));
+        return;
+      }
+
       await splashFloor;
       emit(const AuthState.unauthenticated());
       return;
@@ -45,10 +60,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(AuthState.authenticated(user));
     } on ApiException catch (exception) {
       await splashFloor;
+
+      // Nothing answered, or a 5xx did: the app cannot work at all, so it says
+      // so on its own screen instead of dumping the user on a login form.
+      if (exception.isServerUnavailable) {
+        emit(AuthState.unavailable(errorMessage: exception.message));
+        return;
+      }
+
       // A 401 just means the stored token expired: the interceptor has already
       // dropped it, and landing on the login screen says everything. Any other
-      // failure (offline, server down) keeps the token — it may still be good
-      // on the next launch — and is worth reporting.
+      // 4xx keeps the token — it may still be good on the next launch — and is
+      // worth reporting.
       emit(
         AuthState.unauthenticated(
           errorMessage: exception.isUnauthorized ? null : exception.message,
@@ -70,7 +93,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) => _submit(
     emit,
-    () => _repository.register(email: event.email, password: event.password),
+    () => _repository.register(
+      email: event.email,
+      password: event.password,
+      country: event.country,
+      city: event.city,
+    ),
   );
 
   /// Login and register differ only in the call they make: both show a spinner,

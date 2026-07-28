@@ -1,8 +1,10 @@
 part of 'auth_bloc.dart';
 
 /// [unknown] means "not decided yet" — the app shows the splash screen while the
-/// stored token is being validated. The router guard keys off this enum.
-enum AuthStatus { unknown, authenticated, unauthenticated }
+/// stored token is being validated. [unavailable] means the backend could not be
+/// reached at startup, so there is nothing to decide *with*. The router guard
+/// keys off this enum.
+enum AuthStatus { unknown, authenticated, unauthenticated, unavailable }
 
 class AuthState extends Equatable {
   const AuthState._({
@@ -29,6 +31,12 @@ class AuthState extends Equatable {
          errorCode: errorCode,
          fieldErrors: fieldErrors,
        );
+
+  /// The startup check could not reach the server. [errorMessage] is the
+  /// transport-level reason ("No internet connection."), shown under the
+  /// maintenance copy so an offline user is not told the servers are down.
+  const AuthState.unavailable({String? errorMessage})
+    : this._(status: AuthStatus.unavailable, errorMessage: errorMessage);
 
   /// A login or register attempt is in flight. Status stays
   /// [AuthStatus.unauthenticated] so the router does not navigate mid-request.

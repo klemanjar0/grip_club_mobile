@@ -5,12 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:grip_club_mobile/app/di/injector.dart';
+import 'package:grip_club_mobile/core/network/api_exception.dart';
 import 'package:grip_club_mobile/app/router/app_router.dart';
 import 'package:grip_club_mobile/app/router/routes.dart';
 import 'package:grip_club_mobile/features/auth/bloc/auth_bloc.dart';
 import 'package:grip_club_mobile/features/auth/data/auth_repository.dart';
 import 'package:grip_club_mobile/features/auth/domain/user.dart';
 import 'package:grip_club_mobile/features/auth/view/login_page.dart';
+import 'package:grip_club_mobile/features/auth/view/maintenance_page.dart';
 import 'package:grip_club_mobile/features/auth/view/register_page.dart';
 import 'package:grip_club_mobile/features/auth/view/splash_page.dart';
 import 'package:grip_club_mobile/features/lobbies/view/lobbies_page.dart';
@@ -38,6 +40,7 @@ void main() {
   setUp(() {
     repository = _MockAuthRepository();
     when(repository.logout).thenAnswer((_) async {});
+    when(repository.ensureServerReachable).thenAnswer((_) async {});
     // The dashboard tabs resolve their blocs from the container, so the guard
     // cannot be exercised without one.
     registerDashboardStubs(auth: repository);
@@ -118,6 +121,68 @@ void main() {
     await tester.pump();
 
     expect(find.byType(LobbiesPage), findsOneWidget);
+  });
+
+  testWidgets('sends a launch the server never answered to maintenance', (
+    tester,
+  ) async {
+    when(() => repository.hasStoredSession).thenReturn(true);
+    when(repository.currentUser).thenThrow(
+      const ApiException('No internet connection.', isTransportFailure: true),
+    );
+
+    await pumpApp(tester);
+    bloc.add(const AuthStarted());
+    await tester.pump(_pastSplashFloor);
+    await tester.pump();
+
+    expect(find.byType(MaintenancePage), findsOneWidget);
+    // The reason sits under the maintenance copy, so an offline user is not
+    // told the servers are down.
+    expect(find.text('No internet connection.'), findsOneWidget);
+  });
+
+  testWidgets('retrying from maintenance restarts the flow via the splash', (
+    tester,
+  ) async {
+    when(() => repository.hasStoredSession).thenReturn(true);
+    when(repository.currentUser).thenThrow(
+      const ApiException('No internet connection.', isTransportFailure: true),
+    );
+
+    await pumpApp(tester);
+    bloc.add(const AuthStarted());
+    await tester.pump(_pastSplashFloor);
+    await tester.pump();
+
+    // The server comes back between the failed launch and the retry.
+    when(repository.currentUser).thenAnswer((_) async => _user);
+
+    await tester.tap(find.text('Retry'));
+    await tester.pump();
+
+    expect(find.byType(SplashPage), findsOneWidget);
+
+    await tester.pump(_pastSplashFloor);
+    await tester.pump();
+
+    expect(find.byType(LobbiesPage), findsOneWidget);
+  });
+
+  testWidgets('keeps a signed-out user off the maintenance screen', (
+    tester,
+  ) async {
+    when(() => repository.hasStoredSession).thenReturn(false);
+
+    await pumpApp(tester);
+    bloc.add(const AuthStarted());
+    await tester.pump(_pastSplashFloor);
+    await tester.pump();
+
+    router.go(Routes.maintenance);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginPage), findsOneWidget);
   });
 
   testWidgets('keeps a signed-in user off the auth screens', (tester) async {

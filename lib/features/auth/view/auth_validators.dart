@@ -5,6 +5,7 @@ abstract final class AuthValidators {
   static const int maxEmailLength = 254;
   static const int minPasswordLength = 8;
   static const int maxPasswordLength = 128;
+  static const int maxPlaceLength = 120;
 
   // Deliberately loose: the server owns the real definition, and an overly
   // clever regex only rejects addresses that actually work.
@@ -44,4 +45,11 @@ abstract final class AuthValidators {
 
   static String? confirmPassword(String? value, String password) =>
       value == password ? null : 'Passwords do not match';
+
+  /// A home country or city. Optional everywhere it is asked for — both at
+  /// sign-up and on the profile — so only the length is enforced.
+  static String? place(String? value) =>
+      (value ?? '').trim().length > maxPlaceLength
+      ? 'Keep it under $maxPlaceLength characters'
+      : null;
 }

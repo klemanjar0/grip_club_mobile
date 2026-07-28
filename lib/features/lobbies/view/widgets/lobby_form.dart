@@ -21,6 +21,8 @@ class LobbyForm extends StatefulWidget {
     required this.isSubmitting,
     required this.onSubmit,
     this.initial,
+    this.defaultCountry,
+    this.defaultCity,
     this.currentAvatar,
     this.fieldErrors = const {},
     super.key,
@@ -32,6 +34,12 @@ class LobbyForm extends StatefulWidget {
 
   /// Starting values. Absent when creating.
   final LobbyDraft? initial;
+
+  /// The home location saved on the profile, used to open an empty form on the
+  /// place the user organises in. Ignored when [initial] is set — a lobby that
+  /// exists carries its own country and city.
+  final String? defaultCountry;
+  final String? defaultCity;
 
   /// The picture the lobby already has, so the field can show it. Lives outside
   /// [LobbyDraft], which holds what the user typed rather than what is stored.
@@ -73,8 +81,12 @@ class LobbyFormState extends State<LobbyForm> {
     _descriptionController = TextEditingController(
       text: initial?.description ?? '',
     );
-    _countryController = TextEditingController(text: initial?.country ?? '');
-    _cityController = TextEditingController(text: initial?.city ?? '');
+    _countryController = TextEditingController(
+      text: initial?.country ?? widget.defaultCountry ?? '',
+    );
+    _cityController = TextEditingController(
+      text: initial?.city ?? widget.defaultCity ?? '',
+    );
     _addressController = TextEditingController(text: initial?.address ?? '');
     _chatLinkController = TextEditingController(text: initial?.chatLink ?? '');
     _eventTime = initial?.eventTime;

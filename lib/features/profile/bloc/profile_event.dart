@@ -8,12 +8,14 @@ sealed class ProfileEvent extends Equatable {
 }
 
 /// `null` fields are omitted from the request and left unchanged. `''` is a
-/// real value: it resets [displayName] or [city] to the empty default.
+/// real value: it resets [displayName], [country] or [city] to the empty
+/// default.
 final class ProfilePreferencesSubmitted extends ProfileEvent {
   const ProfilePreferencesSubmitted({
     this.displayName,
     this.locale,
     this.timezone,
+    this.country,
     this.city,
     this.timeFilter,
   });
@@ -21,11 +23,19 @@ final class ProfilePreferencesSubmitted extends ProfileEvent {
   final String? displayName;
   final String? locale;
   final String? timezone;
+  final String? country;
   final String? city;
   final String? timeFilter;
 
   @override
-  List<Object?> get props => [displayName, locale, timezone, city, timeFilter];
+  List<Object?> get props => [
+    displayName,
+    locale,
+    timezone,
+    country,
+    city,
+    timeFilter,
+  ];
 }
 
 /// A new picture, or the removal of the current one.
