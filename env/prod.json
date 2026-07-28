@@ -1,7 +1,7 @@
 {
   "FLAVOR": "prod",
   "APP_NAME": "Grip Club",
-  "API_BASE_URL": "https://api.gripclub.app/api/v1",
+  "API_BASE_URL": "https://klemanjar0.duckdns.org/api/v1",
   "API_CONNECT_TIMEOUT_MS": 15000,
   "ENABLE_HTTP_LOGGING": false
 }

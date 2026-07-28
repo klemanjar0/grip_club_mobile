@@ -74,6 +74,9 @@ Both env files are committed and contain no secrets. Anything sensitive belongs 
 
 The dev flavor points at `http://localhost:8080/api/v1` — the Grip Club backend running on your
 machine. `/api/v1` is part of the base URL, so repository code uses bare paths like `/auth/login`.
+The prod flavor points at `https://klemanjar0.duckdns.org/api/v1`; it must stay HTTPS, since release
+builds allow no cleartext traffic on either platform (Android sets `usesCleartextTraffic` in the debug
+manifest only, and the iOS ATS exception is scoped to local networking).
 
 The **Android emulator cannot reach `localhost`**; it sees the host as `10.0.2.2`. Override the one
 key rather than editing the committed env file:
